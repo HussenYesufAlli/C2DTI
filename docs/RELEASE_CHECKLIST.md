@@ -47,6 +47,16 @@ python scripts/run.py --config configs/minimal.yaml --run-once
 - [ ] Go/No-Go: Tag is created/pushed when required.
 - [ ] Go/No-Go: Release note link is shared with supervisor.
 
+## 7. Definition Of Done (Release)
+
+A release is considered Done only if all conditions below are true:
+
+- [ ] Every Go/No-Go item in Sections 1-6 is checked as Go.
+- [ ] No open blocking issue remains for the release scope.
+- [ ] CI status for the merge commit on `main` is green.
+- [ ] Supervisor-facing evidence exists (changelog, checklist, and CI/test logs).
+- [ ] Rollback path is documented and feasible.
+
 ## Decision
 
 - Final Status: [ ] Go  [ ] No-Go
