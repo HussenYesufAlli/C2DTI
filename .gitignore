@@ -1,0 +1,50 @@
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE/editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build and runtime artifacts
+outputs/
+models/
+cache/
+result/
+
+# ML artifacts
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.onnx
+*.npz
+*.npy
+
+# Logs
+*.log
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Keep folder placeholders if needed
+!outputs/.gitkeep
+!models/.gitkeep
+!data/.gitkeep
