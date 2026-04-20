@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - Demo script now includes quick troubleshooting for common live-run issues.
 - Release checklist now includes an explicit Definition of Done section.
 - Release checklist now includes owner and reviewer sign-off fields.
+- Added `make verify` to run both test and smoke checks in one command.
 
 ## [0.1.0] - 2026-04-21
 

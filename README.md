@@ -46,6 +46,7 @@ Commit in small units, then open a PR from `feature/*` to `dev`.
 ```bash
 make test
 make smoke
+make verify
 ```
 
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
