@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 - Repository scaffold for C2DTI.
 - Professional git workflow documentation.
 - Minimal `unittest` contract checks for config validation and run artifact outputs.
+- GitHub Actions workflow to run unit tests on push and pull requests.
 
 ## [0.1.0] - 2026-04-21
 
