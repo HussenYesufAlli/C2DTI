@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - Minimal CODEOWNERS policy for automatic review assignment on key paths.
 - README status badge section for CI and workflow visibility.
 - Minimal Makefile targets (`test`, `smoke`) for standardized local checks.
+- Two-minute supervisor demo guide with scripted verification flow.
 
 ## [0.1.0] - 2026-04-21
 

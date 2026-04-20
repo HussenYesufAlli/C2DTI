@@ -48,6 +48,8 @@ make test
 make smoke
 ```
 
+For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
+
 ## Current Focus
 
 Initial scaffold is complete. Next implementation phase is controlled integration and evaluation of the cross-view causal agreement objective.
