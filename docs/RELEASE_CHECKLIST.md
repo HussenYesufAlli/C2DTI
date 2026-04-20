@@ -64,3 +64,12 @@ A release is considered Done only if all conditions below are true:
 - Date:
 - Owner:
 - Notes:
+
+## Sign-Off
+
+- Release Owner Name:
+- Release Owner Signature/Approval:
+- Release Owner Date:
+- Reviewer Name:
+- Reviewer Approval:
+- Reviewer Date:
