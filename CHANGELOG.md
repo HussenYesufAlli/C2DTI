@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Structured GitHub issue templates for bug reports and feature requests.
 - Minimal CODEOWNERS policy for automatic review assignment on key paths.
 - README status badge section for CI and workflow visibility.
+- Minimal Makefile targets (`test`, `smoke`) for standardized local checks.
 
 ## [0.1.0] - 2026-04-21
 

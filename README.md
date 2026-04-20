@@ -41,6 +41,13 @@ git checkout -b feature/<task-name>
 
 Commit in small units, then open a PR from `feature/*` to `dev`.
 
+## Common Commands
+
+```bash
+make test
+make smoke
+```
+
 ## Current Focus
 
 Initial scaffold is complete. Next implementation phase is controlled integration and evaluation of the cross-view causal agreement objective.
