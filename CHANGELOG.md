@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - GitHub Actions workflow to run unit tests on push and pull requests.
 - Standard pull request template for supervisor-friendly change reporting.
 - Release Go/No-Go checklist for promoting `dev` to `main`.
+- Structured GitHub issue templates for bug reports and feature requests.
 
 ## [0.1.0] - 2026-04-21
 
