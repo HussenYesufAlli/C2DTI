@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Standard pull request template for supervisor-friendly change reporting.
 - Release Go/No-Go checklist for promoting `dev` to `main`.
 - Structured GitHub issue templates for bug reports and feature requests.
+- Minimal CODEOWNERS policy for automatic review assignment on key paths.
 
 ## [0.1.0] - 2026-04-21
 
