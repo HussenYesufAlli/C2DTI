@@ -70,3 +70,37 @@ python -m unittest discover -s tests -p 'test_*.py'
 python scripts/run.py --config configs/minimal.yaml --dry-run
 python scripts/run.py --config configs/minimal.yaml --run-once
 ```
+
+## Quick Troubleshooting
+
+### `make: command not found`
+
+Use backup commands directly:
+
+```bash
+python -m unittest discover -s tests -p 'test_*.py'
+python scripts/run.py --config configs/minimal.yaml --dry-run
+python scripts/run.py --config configs/minimal.yaml --run-once
+```
+
+### `ModuleNotFoundError` while running scripts
+
+Run commands from the repository root:
+
+```bash
+cd /home/hussen/MINDG/C2DTI
+```
+
+Then re-run `make test` or `make smoke`.
+
+### Config validation failure in smoke run
+
+Confirm required keys exist in `configs/minimal.yaml`:
+
+- `name`
+- `protocol`
+- `output.base_dir`
+
+### Need CI evidence for supervisor review
+
+Open the latest GitHub Actions run and download artifact `unittest-log`.
