@@ -3,7 +3,7 @@ from datetime import datetime
 import yaml
 
 from src.c2dti.config_validation import validate_config
-from src.c2dti.output_io import make_run_dir, write_summary, append_registry
+from src.c2dti.output_io import make_run_dir, write_summary, write_config_snapshot, append_registry
 
 def dry_run(config_path: str) -> int:
     cfg_path = Path(config_path)
@@ -49,6 +49,8 @@ def run_once(config_path: str) -> int:
     base_dir = cfg.get("output", {}).get("base_dir", "outputs")
 
     run_dir = make_run_dir(base_dir, name)
+    config_snapshot = write_config_snapshot(run_dir, cfg)
+
     summary_payload = {
         "run_name": name,
         "protocol": protocol,
@@ -65,6 +67,7 @@ def run_once(config_path: str) -> int:
             "protocol": protocol,
             "status": "completed",
             "summary_path": str(summary_path),
+            "config_snapshot_path": str(config_snapshot),
             "created_at": summary_payload["created_at"],
         },
     )
@@ -72,5 +75,6 @@ def run_once(config_path: str) -> int:
     print("[OK] Run contract completed")
     print(f"run_dir={run_dir}")
     print(f"summary={summary_path}")
+    print(f"config_snapshot={config_snapshot}")
     print(f"registry={Path(base_dir) / 'results_registry.csv'}")
     return 0

@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import datetime
 import csv
 import json
+import yaml
 
 def make_run_dir(base_dir: str, run_name: str) -> Path:
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -14,11 +15,17 @@ def write_summary(run_dir: Path, payload: dict) -> Path:
     out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return out
 
+
+def write_config_snapshot(run_dir: Path, cfg: dict) -> Path:
+    out = run_dir / "config_snapshot.yaml"
+    out.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+    return out
+
 def append_registry(base_dir: str, row: dict) -> Path:
     reg = Path(base_dir) / "results_registry.csv"
     reg.parent.mkdir(parents=True, exist_ok=True)
     write_header = not reg.exists()
-    fields = ["run_name", "protocol", "status", "summary_path", "created_at"]
+    fields = ["run_name", "protocol", "status", "summary_path", "config_snapshot_path", "created_at"]
     with reg.open("a", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields)
         if write_header:
