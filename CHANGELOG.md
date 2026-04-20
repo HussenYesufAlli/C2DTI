@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Minimal Makefile targets (`test`, `smoke`) for standardized local checks.
 - Two-minute supervisor demo guide with scripted verification flow.
 - Runner failure-path tests for missing and invalid configuration handling.
+- CI now uploads unit-test log artifacts for review evidence on each run.
 
 ## [0.1.0] - 2026-04-21
 

@@ -29,4 +29,15 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run unit tests
-        run: python -m unittest discover -s tests -p 'test_*.py'
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m unittest discover -s tests -p 'test_*.py' 2>&1 | tee test-results.txt
+
+      - name: Upload unit test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unittest-log
+          path: test-results.txt
+          if-no-files-found: warn
