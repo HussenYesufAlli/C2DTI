@@ -2,6 +2,12 @@
 
 Cross-view Causal DTI (C2DTI) is a research repository for drug-target interaction prediction with multimodal causal consistency. The core idea is a cross-view causal agreement objective that enforces consistency between sequence and graph evidence under perturbation.
 
+## Status
+
+[![Tests](https://github.com/HussenYesufAlli/C2DTI/actions/workflows/tests.yml/badge.svg)](https://github.com/HussenYesufAlli/C2DTI/actions/workflows/tests.yml)
+[![Branch](https://img.shields.io/badge/branch-dev-blue)](https://github.com/HussenYesufAlli/C2DTI/tree/dev)
+[![PR%20Policy](https://img.shields.io/badge/PR-feature%2F*%20to%20dev-informational)](https://github.com/HussenYesufAlli/C2DTI/blob/main/docs/REPO_WORKFLOW.md)
+
 ## Repository Goals
 
 1. Reproduce the baseline pipeline under a fixed protocol.

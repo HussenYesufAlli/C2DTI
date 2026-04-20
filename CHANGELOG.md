@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Release Go/No-Go checklist for promoting `dev` to `main`.
 - Structured GitHub issue templates for bug reports and feature requests.
 - Minimal CODEOWNERS policy for automatic review assignment on key paths.
+- README status badge section for CI and workflow visibility.
 
 ## [0.1.0] - 2026-04-21
 
