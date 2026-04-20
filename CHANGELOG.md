@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - README status badge section for CI and workflow visibility.
 - Minimal Makefile targets (`test`, `smoke`) for standardized local checks.
 - Two-minute supervisor demo guide with scripted verification flow.
+- Runner failure-path tests for missing and invalid configuration handling.
 
 ## [0.1.0] - 2026-04-21
 
