@@ -29,6 +29,7 @@ All notable changes to this project will be documented in this file.
 - Example real-pipeline config `configs/davis_real_pipeline.yaml` and integration coverage for end-to-end dataset-to-output execution.
 - Strict dataset mode with `dataset.allow_placeholder: false` to fail fast when real files are missing.
 - Strict real-run config templates for DAVIS, BindingDB, and KIBA (`*_real_pipeline_strict.yaml`).
+- Dedicated dataset precheck command via `python scripts/run.py --config <config> --check-data`.
 
 ## [0.1.0] - 2026-04-21
 

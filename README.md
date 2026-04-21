@@ -46,7 +46,11 @@ Commit in small units, then open a PR from `feature/*` to `dev`.
 ```bash
 make test
 make smoke
+python scripts/run.py --config configs/davis_real_pipeline_strict.yaml --check-data
 ```
+
+Use `--check-data` before a strict real run to verify required files and
+matrix shape without starting the prediction pipeline.
 
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
