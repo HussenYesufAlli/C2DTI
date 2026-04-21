@@ -41,6 +41,7 @@ All notable changes to this project will be documented in this file.
 - Added `scripts/fill_demo_data.py` and `make fill-demo-data` to populate scaffolded files with minimal synthetic data for strict-check validation.
 - Added `scripts/run_all_once.py` and `make run-once-all` to execute strict configs end-to-end with one summary.
 - Added `make real-all` to run strict prechecks and strict run-once execution in a single command.
+- Added `make gate-all` to run verify plus full strict real pipeline checks in one quality gate.
 
 ## [0.1.0] - 2026-04-21
 

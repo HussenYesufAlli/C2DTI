@@ -1,4 +1,4 @@
-.PHONY: test smoke verify check-data-example check-data-all scaffold-data-layout fill-demo-data run-once-all real-all
+.PHONY: test smoke verify check-data-example check-data-all scaffold-data-layout fill-demo-data run-once-all real-all gate-all
 
 test:
 	python -m unittest discover -s tests -p 'test_*.py'
@@ -25,3 +25,5 @@ run-once-all:
 	python scripts/run_all_once.py
 
 real-all: check-data-all run-once-all
+
+gate-all: verify real-all

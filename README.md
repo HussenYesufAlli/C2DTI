@@ -52,6 +52,7 @@ make scaffold-data-layout
 make fill-demo-data
 make run-once-all
 make real-all
+make gate-all
 ```
 
 Use `--check-data` before a strict real run to verify required files and
@@ -90,6 +91,9 @@ pass/fail summary for end-to-end run contracts.
 
 Use `make real-all` to run strict data prechecks first and then execute all
 strict run-once configs in one command.
+
+Use `make gate-all` as the full quality gate: unit tests, smoke checks, strict
+data prechecks, and strict run-once execution in a single command.
 
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
