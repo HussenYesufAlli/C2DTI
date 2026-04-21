@@ -90,6 +90,26 @@ def _print_next_actions(results: List[Tuple[str, int]]) -> None:
             if content_reason:
                 print(f"- Fix data content: {content_reason}")
 
+            dataset_name = str(report.get("dataset_name", "")).upper()
+            dataset_path = str(report.get("dataset_path", ""))
+            if "no data rows" in str(content_reason).lower() and dataset_name == "BINDINGDB":
+                print(f"- Add at least one data row to: {dataset_path}")
+                print("- Required columns: Drug_ID, Target_ID, Y")
+
+            if "no non-empty rows" in str(content_reason).lower() and dataset_name in {"DAVIS", "KIBA"}:
+                print(f"- Add at least one non-empty line in: {dataset_path}/drug_smiles.txt")
+                print(f"- Add at least one non-empty line in: {dataset_path}/target_sequences.txt")
+                print(f"- Fill {dataset_path}/Y.txt with a numeric matrix of shape [num_drugs, num_targets]")
+
+            if "shape" in str(content_reason).lower() and dataset_name in {"DAVIS", "KIBA"}:
+                expected_drugs = content_validation.get("num_drugs_from_file")
+                expected_targets = content_validation.get("num_targets_from_file")
+                if expected_drugs is not None and expected_targets is not None:
+                    print(
+                        f"- Update {dataset_path}/Y.txt to shape [{expected_drugs}, {expected_targets}] "
+                        "to match sequence files"
+                    )
+
             missing_columns = content_validation.get("missing_columns", [])
             for column in missing_columns:
                 print(f"- Add missing column: {column}")

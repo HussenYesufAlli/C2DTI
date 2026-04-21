@@ -6,6 +6,7 @@ import csv
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import warnings
 
 import numpy as np
 import yaml
@@ -254,7 +255,9 @@ def _validate_sequence_matrix_content(dataset_name: str, dataset_path: Path) -> 
     try:
         n_drugs = _count_non_empty_lines(drug_file)
         n_targets = _count_non_empty_lines(target_file)
-        raw_matrix = np.loadtxt(y_file, dtype=np.float32)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=UserWarning)
+            raw_matrix = np.loadtxt(y_file, dtype=np.float32)
     except Exception as exc:
         validation["reason"] = f"Failed to parse sequence/matrix files: {exc}"
         return validation
