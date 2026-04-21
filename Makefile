@@ -1,4 +1,4 @@
-.PHONY: test smoke verify check-data-example check-data-all scaffold-data-layout fill-demo-data
+.PHONY: test smoke verify check-data-example check-data-all scaffold-data-layout fill-demo-data run-once-all
 
 test:
 	python -m unittest discover -s tests -p 'test_*.py'
@@ -20,3 +20,6 @@ scaffold-data-layout:
 
 fill-demo-data:
 	python scripts/fill_demo_data.py
+
+run-once-all:
+	python scripts/run_all_once.py

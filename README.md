@@ -50,6 +50,7 @@ python scripts/run.py --config configs/davis_real_pipeline_strict.yaml --check-d
 make check-data-all
 make scaffold-data-layout
 make fill-demo-data
+make run-once-all
 ```
 
 Use `--check-data` before a strict real run to verify required files and
@@ -82,6 +83,9 @@ quickly before filling real dataset contents.
 
 Use `make fill-demo-data` to populate scaffolded files with minimal synthetic
 content that satisfies strict checks for quick pipeline validation.
+
+Use `make run-once-all` to execute all strict configs once and get a compact
+pass/fail summary for end-to-end run contracts.
 
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
