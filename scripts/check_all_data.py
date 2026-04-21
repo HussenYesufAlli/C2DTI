@@ -2,6 +2,7 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
+from typing import List, Tuple
 
 
 DEFAULT_CONFIGS = [
@@ -11,7 +12,7 @@ DEFAULT_CONFIGS = [
 ]
 
 
-def _resolve_configs(cli_configs: list[str]) -> list[str]:
+def _resolve_configs(cli_configs: List[str]) -> List[str]:
     """Resolve config list from CLI; use defaults if none provided."""
     if cli_configs:
         return cli_configs
@@ -36,7 +37,7 @@ def main() -> None:
     args = parser.parse_args()
 
     configs = _resolve_configs(args.configs or [])
-    results: list[tuple[str, int]] = []
+    results: List[Tuple[str, int]] = []
 
     print("[INFO] Running strict dataset prechecks...")
     for config in configs:
