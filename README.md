@@ -48,6 +48,7 @@ make test
 make smoke
 python scripts/run.py --config configs/davis_real_pipeline_strict.yaml --check-data
 make check-data-all
+make scaffold-data-layout
 ```
 
 Use `--check-data` before a strict real run to verify required files and
@@ -74,6 +75,9 @@ and KIBA in one shot with a compact pass/fail summary.
 
 When checks fail, `make check-data-all` now prints a next-actions checklist
 derived from JSON reports (for example, exact missing file paths to create).
+
+Use `make scaffold-data-layout` to create the required `data/` file structure
+quickly before filling real dataset contents.
 
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 

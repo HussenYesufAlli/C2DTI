@@ -37,6 +37,7 @@ All notable changes to this project will be documented in this file.
 - Added `scripts/check_all_data.py` and `make check-data-all` to run strict prechecks for DAVIS/BindingDB/KIBA with one summary.
 - `check-data-all` now reads generated reports and prints a next-actions checklist (missing files/content fixes) per failed config.
 - Strict precheck now rejects BindingDB CSVs with header-only content and DAVIS/KIBA datasets with empty sequence files.
+- Added `scripts/scaffold_data_layout.py` and `make scaffold-data-layout` to create required dataset file paths quickly.
 
 ## [0.1.0] - 2026-04-21
 
