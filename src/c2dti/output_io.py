@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import datetime
 import csv
 import json
+from typing import List
 import yaml
 import numpy as np
 
@@ -23,7 +24,7 @@ def write_config_snapshot(run_dir: Path, cfg: dict) -> Path:
     return out
 
 
-def write_prediction_matrix(run_dir: Path, drugs: list[str], targets: list[str], matrix: np.ndarray) -> Path:
+def write_prediction_matrix(run_dir: Path, drugs: List[str], targets: List[str], matrix: np.ndarray) -> Path:
     """Persist the prediction matrix as a CSV artifact for inspection."""
     out = run_dir / "predictions.csv"
     with out.open("w", newline="", encoding="utf-8") as f:

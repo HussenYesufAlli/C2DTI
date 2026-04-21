@@ -48,6 +48,20 @@ class TestConfigValidation(unittest.TestCase):
         self.assertIn("dataset.name must be one of: BindingDB, DAVIS, KIBA", errors)
         self.assertIn("dataset.path is required when dataset config is provided", errors)
 
+    def test_invalid_allow_placeholder_type_is_rejected(self) -> None:
+        cfg = {
+            "name": "C2DTI_INVALID_ALLOW_PLACEHOLDER",
+            "protocol": "P1",
+            "output": {"base_dir": "outputs"},
+            "dataset": {
+                "name": "DAVIS",
+                "path": "data/davis",
+                "allow_placeholder": "no",
+            },
+        }
+        errors = validate_config(cfg)
+        self.assertIn("dataset.allow_placeholder must be a boolean", errors)
+
 
 if __name__ == "__main__":
     unittest.main()
