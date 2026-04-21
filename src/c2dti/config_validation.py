@@ -30,7 +30,12 @@ def _validate_dataset_config(dataset_cfg: Any) -> List[str]:
 
 
 def _validate_model_config(model_cfg: Any) -> List[str]:
-    """Validate optional model configuration used by the real pipeline path."""
+    """Validate optional model configuration used by the real pipeline path.
+
+    Supported model names and their config keys:
+      simple_baseline      : no additional keys required
+      matrix_factorization : latent_dim (int), epochs (int), lr (float), seed (int)
+    """
     if model_cfg is None:
         return []
 
@@ -41,10 +46,34 @@ def _validate_model_config(model_cfg: Any) -> List[str]:
     if not isinstance(model_name, str):
         return ["model.name must be a string"]
 
-    if model_name.strip().lower() not in {"simple_baseline"}:
-        return ["model.name must be one of: simple_baseline"]
+    valid_names = {"simple_baseline", "matrix_factorization"}
+    if model_name.strip().lower() not in valid_names:
+        return [f"model.name must be one of: {', '.join(sorted(valid_names))}"]
 
-    return []
+    errors: List[str] = []
+
+    # Validate matrix_factorization-specific hyperparameters when present
+    if "latent_dim" in model_cfg:
+        val = model_cfg["latent_dim"]
+        if not isinstance(val, int) or val < 1:
+            errors.append("model.latent_dim must be a positive integer")
+
+    if "epochs" in model_cfg:
+        val = model_cfg["epochs"]
+        if not isinstance(val, int) or val < 1:
+            errors.append("model.epochs must be a positive integer")
+
+    if "lr" in model_cfg:
+        val = model_cfg["lr"]
+        if not isinstance(val, (int, float)) or float(val) <= 0.0:
+            errors.append("model.lr must be a positive number")
+
+    if "seed" in model_cfg:
+        val = model_cfg["seed"]
+        if not isinstance(val, int):
+            errors.append("model.seed must be an integer")
+
+    return errors
 
 
 def _validate_perturbation_config(perturbation_cfg: Any) -> List[str]:

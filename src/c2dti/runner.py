@@ -8,6 +8,7 @@ from src.c2dti.causal_objective import compute_causal_score, compute_causal_reli
 from src.c2dti.data_utils import summarize_matrix
 from src.c2dti.dataset_loader import load_dti_dataset
 from src.c2dti.dti_model import create_predictor
+from src.c2dti.evaluation import evaluate_predictions
 from src.c2dti.perturbation import perturb_dataset_interactions
 
 def dry_run(config_path: str) -> int:
@@ -82,11 +83,13 @@ def run_once(config_path: str) -> int:
             print(f"[ERROR] Please provide real files at: {dataset_cfg.get('path')}")
             return 3
 
-        predictor = create_predictor(cfg.get("model", {}).get("name", "simple_baseline"))
+        # Pass the full model config dict so MatrixFactorizationDTIPredictor
+        # can read latent_dim, epochs, lr, seed from the YAML file.
+        predictor = create_predictor(cfg.get("model", {}))
         predictions = predictor.fit_predict(dataset)
         prediction_path = write_prediction_matrix(run_dir, dataset.drugs, dataset.targets, predictions)
 
-        summary_payload["notes"] = "Real DTI pipeline completed with dataset loading, prediction, and optional causal reliability."
+        summary_payload["notes"] = "Real DTI pipeline completed with dataset loading, prediction, evaluation, and optional causal reliability."
         summary_payload["dataset_name"] = dataset.metadata.get("source", dataset_cfg["name"])
         summary_payload["dataset_placeholder"] = bool(dataset.metadata.get("is_placeholder", False))
         summary_payload["dataset_allow_placeholder"] = allow_placeholder
@@ -94,6 +97,27 @@ def run_once(config_path: str) -> int:
         summary_payload["num_targets"] = len(dataset.targets)
         summary_payload["prediction_path"] = str(prediction_path)
         summary_payload["prediction_stats"] = summarize_matrix(predictions)
+
+        # Evaluate predictions against the ground-truth affinity matrix.
+        # evaluate_predictions automatically skips NaN entries (unknown affinities).
+        summary_payload["evaluation_metrics"] = evaluate_predictions(
+            dataset.interactions, predictions
+        )
+
+        # If the predictor was trainable, record its loss curve and save the checkpoint.
+        if hasattr(predictor, "train_loss_history") and predictor.train_loss_history:
+            # Store first, last, and min loss so the summary is human-readable
+            history = predictor.train_loss_history
+            summary_payload["training"] = {
+                "epochs_completed": len(history),
+                "loss_start": round(history[0], 6),
+                "loss_final": round(history[-1], 6),
+                "loss_min": round(min(history), 6),
+            }
+
+        if hasattr(predictor, "save_checkpoint"):
+            checkpoint_path = predictor.save_checkpoint(run_dir)
+            summary_payload["checkpoint_path"] = str(checkpoint_path)
 
         if causal_enabled:
             perturbation_cfg = cfg.get("perturbation", {})
