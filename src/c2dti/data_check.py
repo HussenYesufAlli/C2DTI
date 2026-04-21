@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -40,6 +41,45 @@ def summarize_dataset(dataset: DTIDataset) -> Dict[str, object]:
     }
 
 
+def _resolve_report_path(cfg: Dict[str, Any], config_path: Path) -> Path:
+    """Build a stable JSON report path under output/checks.
+
+    We keep the filename deterministic so each config has one reusable report
+    that gets refreshed every time the user runs the precheck.
+    """
+    base_dir = Path(cfg.get("output", {}).get("base_dir", "outputs"))
+    report_dir = base_dir / "checks"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    return report_dir / f"{config_path.stem}_data_check.json"
+
+
+def _write_report(report_path: Path, payload: Dict[str, Any]) -> None:
+    """Persist the dataset precheck report as pretty JSON."""
+    report_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _build_required_file_report(required_files: List[Path]) -> List[Dict[str, str]]:
+    """Describe each required dataset file and whether it exists."""
+    report_rows: List[Dict[str, str]] = []
+    for required_file in required_files:
+        report_rows.append(
+            {
+                "path": str(required_file),
+                "status": "ok" if required_file.exists() else "missing",
+            }
+        )
+    return report_rows
+
+
+def _emit_report(report_path: Optional[Path], payload: Dict[str, Any]) -> None:
+    """Write the report when a valid config gives us a destination path."""
+    if report_path is None:
+        return
+
+    _write_report(report_path, payload)
+    print(f"report={report_path}")
+
+
 def check_data(config_path: str) -> int:
     """Validate dataset availability and shape before a real run starts.
 
@@ -64,15 +104,27 @@ def check_data(config_path: str) -> int:
             print(f"- {error}")
         return 2
 
+    report_path = _resolve_report_path(cfg, cfg_path)
+
     dataset_cfg = cfg.get("dataset")
     if not dataset_cfg:
         print("[ERROR] dataset config is required for --check-data")
+        _emit_report(
+            report_path,
+            {
+                "status": "error",
+                "exit_code": 2,
+                "config": str(cfg_path),
+                "reason": "dataset config is required for --check-data",
+            },
+        )
         return 2
 
     dataset_name = dataset_cfg["name"]
     dataset_path = Path(dataset_cfg["path"])
     required_files = _required_dataset_files(dataset_name, dataset_path)
     missing_files = [path for path in required_files if not path.exists()]
+    file_report = _build_required_file_report(required_files)
 
     print(f"[INFO] Checking dataset: {dataset_name}")
     print(f"[INFO] dataset.path={dataset_path}")
@@ -84,6 +136,19 @@ def check_data(config_path: str) -> int:
         print("[ERROR] Dataset files are missing for a real run:")
         for missing_file in missing_files:
             print(f"- {missing_file}")
+        _emit_report(
+            report_path,
+            {
+                "status": "error",
+                "exit_code": 3,
+                "config": str(cfg_path),
+                "dataset_name": dataset_name,
+                "dataset_path": str(dataset_path),
+                "required_files": file_report,
+                "missing_files": [str(path) for path in missing_files],
+                "reason": "Dataset files are missing for a real run",
+            },
+        )
         return 3
 
     dataset = load_dti_dataset(dataset_name, dataset_path)
@@ -92,6 +157,19 @@ def check_data(config_path: str) -> int:
     if bool(dataset_summary["is_placeholder"]):
         print("[ERROR] Dataset loader fell back to placeholder data")
         print("[ERROR] Real dataset files may exist but are invalid in format or shape")
+        _emit_report(
+            report_path,
+            {
+                "status": "error",
+                "exit_code": 3,
+                "config": str(cfg_path),
+                "dataset_name": dataset_name,
+                "dataset_path": str(dataset_path),
+                "required_files": file_report,
+                "dataset_summary": dataset_summary,
+                "reason": "Dataset loader fell back to placeholder data",
+            },
+        )
         return 3
 
     print("[OK] Dataset check passed")
@@ -99,4 +177,16 @@ def check_data(config_path: str) -> int:
     print(f"num_drugs={dataset_summary['num_drugs']}")
     print(f"num_targets={dataset_summary['num_targets']}")
     print(f"matrix_shape={dataset_summary['matrix_shape']}")
+    _emit_report(
+        report_path,
+        {
+            "status": "ok",
+            "exit_code": 0,
+            "config": str(cfg_path),
+            "dataset_name": dataset_name,
+            "dataset_path": str(dataset_path),
+            "required_files": file_report,
+            "dataset_summary": dataset_summary,
+        },
+    )
     return 0

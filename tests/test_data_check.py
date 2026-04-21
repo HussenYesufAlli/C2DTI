@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 import tempfile
@@ -36,6 +37,14 @@ class TestDataCheck(unittest.TestCase):
             code = check_data(str(cfg_path))
             self.assertEqual(code, 0)
 
+            report_path = tmp_path / "outputs" / "checks" / "valid_davis_data_check.json"
+            self.assertTrue(report_path.exists())
+
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "ok")
+            self.assertEqual(report["exit_code"], 0)
+            self.assertEqual(report["dataset_summary"]["matrix_shape"], [2, 3])
+
     def test_check_data_fails_when_required_files_are_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -51,6 +60,14 @@ class TestDataCheck(unittest.TestCase):
             code = check_data(str(cfg_path))
             self.assertEqual(code, 3)
 
+            report_path = tmp_path / "outputs" / "checks" / "missing_davis_data_check.json"
+            self.assertTrue(report_path.exists())
+
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "error")
+            self.assertEqual(report["exit_code"], 3)
+            self.assertEqual(len(report["missing_files"]), 3)
+
     def test_check_data_requires_dataset_section(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -64,3 +81,10 @@ class TestDataCheck(unittest.TestCase):
 
             code = check_data(str(cfg_path))
             self.assertEqual(code, 2)
+
+            report_path = tmp_path / "outputs" / "checks" / "no_dataset_data_check.json"
+            self.assertTrue(report_path.exists())
+
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "error")
+            self.assertEqual(report["exit_code"], 2)

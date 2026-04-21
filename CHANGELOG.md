@@ -30,6 +30,7 @@ All notable changes to this project will be documented in this file.
 - Strict dataset mode with `dataset.allow_placeholder: false` to fail fast when real files are missing.
 - Strict real-run config templates for DAVIS, BindingDB, and KIBA (`*_real_pipeline_strict.yaml`).
 - Dedicated dataset precheck command via `python scripts/run.py --config <config> --check-data`.
+- Dataset precheck now writes reusable JSON reports under `outputs/checks/` with file status and dataset summary.
 
 ## [0.1.0] - 2026-04-21
 

@@ -52,6 +52,9 @@ python scripts/run.py --config configs/davis_real_pipeline_strict.yaml --check-d
 Use `--check-data` before a strict real run to verify required files and
 matrix shape without starting the prediction pipeline.
 
+Each dataset precheck also writes a reusable JSON report under
+`outputs/checks/<config_name>_data_check.json`.
+
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 ## Current Focus
