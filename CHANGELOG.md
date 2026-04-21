@@ -47,6 +47,7 @@ All notable changes to this project will be documented in this file.
 - Extended `make gate-all` to include output validation as an enforced third gate step.
 - Added `scripts/gate_summary.py` and `make gate-summary` to generate `outputs/gates/latest_gate_summary.md` from latest gate evidence.
 - Added `.github/workflows/gate.yml` to enforce `make gate-all` and `make gate-summary` on push/PR and upload gate evidence artifacts.
+- Added `scripts/gate_bundle.py` and `make gate-bundle` to package latest gate evidence into a single tar.gz artifact.
 
 ## [0.1.0] - 2026-04-21
 

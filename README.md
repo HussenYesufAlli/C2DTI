@@ -58,6 +58,7 @@ make run-once-all
 make real-all
 make validate-outputs
 make gate-summary
+make gate-bundle
 make gate-all
 ```
 
@@ -108,6 +109,9 @@ registry entries).
 
 Use `make gate-summary` to generate `outputs/gates/latest_gate_summary.md`
 from the latest gate and validation reports and fail if any status is non-pass.
+
+Use `make gate-bundle` to package latest gate evidence into
+`outputs/gates/bundles/gate_bundle_<timestamp>.tar.gz` for supervisor/PR sharing.
 
 `make gate-all` now writes a JSON evidence report under
 `outputs/gates/gate_all_<timestamp>.json` with step-level pass/fail status.

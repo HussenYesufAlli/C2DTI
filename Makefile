@@ -1,4 +1,4 @@
-.PHONY: test smoke verify check-data-example check-data-all scaffold-data-layout fill-demo-data run-once-all real-all validate-outputs gate-summary gate-all
+.PHONY: test smoke verify check-data-example check-data-all scaffold-data-layout fill-demo-data run-once-all real-all validate-outputs gate-summary gate-bundle gate-all
 
 test:
 	python -m unittest discover -s tests -p 'test_*.py'
@@ -31,6 +31,9 @@ validate-outputs:
 
 gate-summary:
 	python scripts/gate_summary.py --fail-on-nonpass
+
+gate-bundle:
+	python scripts/gate_bundle.py
 
 gate-all:
 	python scripts/gate_all.py
