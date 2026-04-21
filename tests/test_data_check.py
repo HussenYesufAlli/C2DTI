@@ -44,6 +44,8 @@ class TestDataCheck(unittest.TestCase):
             self.assertEqual(report["status"], "ok")
             self.assertEqual(report["exit_code"], 0)
             self.assertEqual(report["dataset_summary"]["matrix_shape"], [2, 3])
+            self.assertEqual(report["dataset_schema"]["dataset_type"], "directory")
+            self.assertIn("drug_smiles.txt", report["dataset_schema"]["required_files"])
 
     def test_check_data_fails_when_required_files_are_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -67,6 +69,33 @@ class TestDataCheck(unittest.TestCase):
             self.assertEqual(report["status"], "error")
             self.assertEqual(report["exit_code"], 3)
             self.assertEqual(len(report["missing_files"]), 3)
+            self.assertEqual(report["dataset_schema"]["path_kind"], "directory")
+            self.assertIn("Y.txt", report["dataset_schema"]["required_files"])
+
+    def test_check_data_bindingdb_report_includes_required_columns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            cfg_path = tmp_path / "bindingdb_missing.yaml"
+            cfg = {
+                "name": "C2DTI_BINDINGDB_CHECK_FAIL",
+                "protocol": "P1",
+                "output": {"base_dir": str(tmp_path / "outputs")},
+                "dataset": {
+                    "name": "BindingDB",
+                    "path": str(tmp_path / "bindingdb.csv"),
+                    "allow_placeholder": False,
+                },
+            }
+            cfg_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+
+            code = check_data(str(cfg_path))
+            self.assertEqual(code, 3)
+
+            report_path = tmp_path / "outputs" / "checks" / "bindingdb_missing_data_check.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["dataset_schema"]["dataset_type"], "csv")
+            self.assertEqual(report["dataset_schema"]["path_kind"], "file")
+            self.assertEqual(report["dataset_schema"]["required_columns"], ["Drug_ID", "Target_ID", "Y"])
 
     def test_check_data_requires_dataset_section(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -30,6 +30,55 @@ def _required_dataset_files(dataset_name: str, dataset_path: Path) -> List[Path]
     return []
 
 
+def _dataset_schema_details(dataset_name: str, dataset_path: Path) -> Dict[str, Any]:
+    """Describe the expected dataset structure for the JSON report."""
+    normalized_name = dataset_name.strip().upper()
+    if normalized_name == "BINDINGDB":
+        return {
+            "dataset_type": "csv",
+            "path_kind": "file",
+            "expected_path": str(dataset_path),
+            "required_columns": ["Drug_ID", "Target_ID", "Y"],
+            "optional_alias_columns": {
+                "Drug_ID": ["Drug"],
+                "Target_ID": ["Target"],
+            },
+            "notes": [
+                "BindingDB path should point to a CSV file.",
+                "The loader converts Y from nM-like affinity values into pKd-based binary labels.",
+            ],
+        }
+
+    if normalized_name in {"DAVIS", "KIBA"}:
+        return {
+            "dataset_type": "directory",
+            "path_kind": "directory",
+            "expected_path": str(dataset_path),
+            "required_files": [
+                "drug_smiles.txt",
+                "target_sequences.txt",
+                "Y.txt",
+            ],
+            "file_descriptions": {
+                "drug_smiles.txt": "One drug SMILES string per line.",
+                "target_sequences.txt": "One target protein sequence per line.",
+                "Y.txt": "Whitespace-delimited numeric interaction matrix with shape (num_drugs, num_targets).",
+            },
+            "notes": [
+                f"{dataset_name} path should point to a directory.",
+                "The number of rows in Y.txt must match the number of drug lines.",
+                "The number of columns in Y.txt must match the number of target lines.",
+            ],
+        }
+
+    return {
+        "dataset_type": "unknown",
+        "path_kind": "unknown",
+        "expected_path": str(dataset_path),
+        "notes": ["Unknown dataset; no schema details available."],
+    }
+
+
 def summarize_dataset(dataset: DTIDataset) -> Dict[str, object]:
     """Build a small summary payload for validated dataset contents."""
     return {
@@ -125,6 +174,7 @@ def check_data(config_path: str) -> int:
     required_files = _required_dataset_files(dataset_name, dataset_path)
     missing_files = [path for path in required_files if not path.exists()]
     file_report = _build_required_file_report(required_files)
+    schema_details = _dataset_schema_details(dataset_name, dataset_path)
 
     print(f"[INFO] Checking dataset: {dataset_name}")
     print(f"[INFO] dataset.path={dataset_path}")
@@ -144,6 +194,7 @@ def check_data(config_path: str) -> int:
                 "config": str(cfg_path),
                 "dataset_name": dataset_name,
                 "dataset_path": str(dataset_path),
+                "dataset_schema": schema_details,
                 "required_files": file_report,
                 "missing_files": [str(path) for path in missing_files],
                 "reason": "Dataset files are missing for a real run",
@@ -165,6 +216,7 @@ def check_data(config_path: str) -> int:
                 "config": str(cfg_path),
                 "dataset_name": dataset_name,
                 "dataset_path": str(dataset_path),
+                "dataset_schema": schema_details,
                 "required_files": file_report,
                 "dataset_summary": dataset_summary,
                 "reason": "Dataset loader fell back to placeholder data",
@@ -185,6 +237,7 @@ def check_data(config_path: str) -> int:
             "config": str(cfg_path),
             "dataset_name": dataset_name,
             "dataset_path": str(dataset_path),
+            "dataset_schema": schema_details,
             "required_files": file_report,
             "dataset_summary": dataset_summary,
         },

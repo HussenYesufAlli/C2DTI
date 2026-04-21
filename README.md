@@ -55,6 +55,9 @@ matrix shape without starting the prediction pipeline.
 Each dataset precheck also writes a reusable JSON report under
 `outputs/checks/<config_name>_data_check.json`.
 
+That report now includes dataset-specific schema details, such as expected
+BindingDB columns and DAVIS/KIBA required file names.
+
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 ## Current Focus
