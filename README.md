@@ -58,6 +58,9 @@ Each dataset precheck also writes a reusable JSON report under
 That report now includes dataset-specific schema details, such as expected
 BindingDB columns and DAVIS/KIBA required file names.
 
+For BindingDB, the precheck also validates the CSV header and records which
+required columns were found, resolved via aliases, or still missing.
+
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 ## Current Focus

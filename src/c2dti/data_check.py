@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -120,6 +121,85 @@ def _build_required_file_report(required_files: List[Path]) -> List[Dict[str, st
     return report_rows
 
 
+def _validate_bindingdb_content(dataset_path: Path) -> Dict[str, Any]:
+    """Validate the BindingDB CSV header before the loader runs.
+
+    This gives the user a precise report about column readiness instead of a
+    generic placeholder fallback when the file exists but is malformed.
+    """
+    validation: Dict[str, Any] = {
+        "status": "skipped",
+        "available_columns": [],
+        "required_columns": ["Drug_ID", "Target_ID", "Y"],
+        "optional_alias_columns": {
+            "Drug_ID": ["Drug"],
+            "Target_ID": ["Target"],
+        },
+        "resolved_columns": {},
+        "missing_columns": [],
+        "reason": "BindingDB CSV validation not run",
+    }
+
+    if not dataset_path.exists():
+        validation["reason"] = "BindingDB CSV file does not exist"
+        return validation
+
+    try:
+        with dataset_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.reader(handle)
+            header_row = next(reader, None)
+    except Exception as exc:
+        validation["status"] = "error"
+        validation["reason"] = f"Failed to read BindingDB CSV header: {exc}"
+        return validation
+
+    if not header_row:
+        validation["status"] = "error"
+        validation["reason"] = "BindingDB CSV is empty"
+        return validation
+
+    available_columns = [column.strip() for column in header_row]
+    validation["available_columns"] = available_columns
+
+    resolved_columns: Dict[str, str] = {}
+    missing_columns: List[str] = []
+    for required_column in validation["required_columns"]:
+        if required_column in available_columns:
+            resolved_columns[required_column] = required_column
+            continue
+
+        aliases = validation["optional_alias_columns"].get(required_column, [])
+        alias_match = next((alias for alias in aliases if alias in available_columns), None)
+        if alias_match is not None:
+            resolved_columns[required_column] = alias_match
+        else:
+            missing_columns.append(required_column)
+
+    validation["resolved_columns"] = resolved_columns
+    validation["missing_columns"] = missing_columns
+
+    if missing_columns:
+        validation["status"] = "error"
+        validation["reason"] = "BindingDB CSV is missing required columns"
+        return validation
+
+    validation["status"] = "ok"
+    validation["reason"] = "BindingDB CSV contains the required columns"
+    return validation
+
+
+def _validate_dataset_content(dataset_name: str, dataset_path: Path) -> Dict[str, Any]:
+    """Run dataset-specific content checks after file existence passes."""
+    normalized_name = dataset_name.strip().upper()
+    if normalized_name == "BINDINGDB":
+        return _validate_bindingdb_content(dataset_path)
+
+    return {
+        "status": "skipped",
+        "reason": f"No additional content validation implemented for {dataset_name}",
+    }
+
+
 def _emit_report(report_path: Optional[Path], payload: Dict[str, Any]) -> None:
     """Write the report when a valid config gives us a destination path."""
     if report_path is None:
@@ -202,6 +282,26 @@ def check_data(config_path: str) -> int:
         )
         return 3
 
+    content_validation = _validate_dataset_content(dataset_name, dataset_path)
+    if content_validation.get("status") == "error":
+        print("[ERROR] Dataset content validation failed")
+        print(f"[ERROR] {content_validation.get('reason')}")
+        _emit_report(
+            report_path,
+            {
+                "status": "error",
+                "exit_code": 3,
+                "config": str(cfg_path),
+                "dataset_name": dataset_name,
+                "dataset_path": str(dataset_path),
+                "dataset_schema": schema_details,
+                "required_files": file_report,
+                "content_validation": content_validation,
+                "reason": "Dataset content validation failed",
+            },
+        )
+        return 3
+
     dataset = load_dti_dataset(dataset_name, dataset_path)
     dataset_summary = summarize_dataset(dataset)
 
@@ -218,6 +318,7 @@ def check_data(config_path: str) -> int:
                 "dataset_path": str(dataset_path),
                 "dataset_schema": schema_details,
                 "required_files": file_report,
+                "content_validation": content_validation,
                 "dataset_summary": dataset_summary,
                 "reason": "Dataset loader fell back to placeholder data",
             },
@@ -239,6 +340,7 @@ def check_data(config_path: str) -> int:
             "dataset_path": str(dataset_path),
             "dataset_schema": schema_details,
             "required_files": file_report,
+            "content_validation": content_validation,
             "dataset_summary": dataset_summary,
         },
     )

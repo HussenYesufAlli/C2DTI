@@ -97,6 +97,64 @@ class TestDataCheck(unittest.TestCase):
             self.assertEqual(report["dataset_schema"]["path_kind"], "file")
             self.assertEqual(report["dataset_schema"]["required_columns"], ["Drug_ID", "Target_ID", "Y"])
 
+    def test_check_data_bindingdb_invalid_columns_are_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            csv_path = tmp_path / "bindingdb.csv"
+            csv_path.write_text("BadCol1,BadCol2\n1,2\n", encoding="utf-8")
+
+            cfg_path = tmp_path / "bindingdb_invalid_columns.yaml"
+            cfg = {
+                "name": "C2DTI_BINDINGDB_INVALID_COLUMNS",
+                "protocol": "P1",
+                "output": {"base_dir": str(tmp_path / "outputs")},
+                "dataset": {
+                    "name": "BindingDB",
+                    "path": str(csv_path),
+                    "allow_placeholder": False,
+                },
+            }
+            cfg_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+
+            code = check_data(str(cfg_path))
+            self.assertEqual(code, 3)
+
+            report_path = tmp_path / "outputs" / "checks" / "bindingdb_invalid_columns_data_check.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["content_validation"]["status"], "error")
+            self.assertEqual(report["content_validation"]["available_columns"], ["BadCol1", "BadCol2"])
+            self.assertEqual(report["content_validation"]["missing_columns"], ["Drug_ID", "Target_ID", "Y"])
+
+    def test_check_data_bindingdb_valid_columns_are_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            csv_path = tmp_path / "bindingdb.csv"
+            csv_path.write_text("Drug_ID,Target_ID,Y\nD1,T1,10.0\n", encoding="utf-8")
+
+            cfg_path = tmp_path / "bindingdb_valid_columns.yaml"
+            cfg = {
+                "name": "C2DTI_BINDINGDB_VALID_COLUMNS",
+                "protocol": "P1",
+                "output": {"base_dir": str(tmp_path / "outputs")},
+                "dataset": {
+                    "name": "BindingDB",
+                    "path": str(csv_path),
+                    "allow_placeholder": False,
+                },
+            }
+            cfg_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+
+            code = check_data(str(cfg_path))
+            self.assertEqual(code, 0)
+
+            report_path = tmp_path / "outputs" / "checks" / "bindingdb_valid_columns_data_check.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["content_validation"]["status"], "ok")
+            self.assertEqual(
+                report["content_validation"]["resolved_columns"],
+                {"Drug_ID": "Drug_ID", "Target_ID": "Target_ID", "Y": "Y"},
+            )
+
     def test_check_data_requires_dataset_section(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
