@@ -21,6 +21,9 @@ All notable changes to this project will be documented in this file.
 - Demo script now includes quick troubleshooting for common live-run issues.
 - Release checklist now includes an explicit Definition of Done section.
 - Release checklist now includes owner and reviewer sign-off fields.
+- **Non-breaking causal objective hook**: optional `causal` config section with `enabled` and `weight` keys; when enabled, computes placeholder causal score and includes it in run summary.
+- Causal objective module with validation, score computation, and comprehensive unit tests (8 new tests, all passing).
+- Example config `configs/causal_enabled.yaml` showing causal feature usage.
 
 ## [0.1.0] - 2026-04-21
 

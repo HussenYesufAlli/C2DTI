@@ -4,6 +4,7 @@ import yaml
 
 from src.c2dti.config_validation import validate_config
 from src.c2dti.output_io import make_run_dir, write_summary, write_config_snapshot, append_registry
+from src.c2dti.causal_objective import compute_causal_score
 
 def dry_run(config_path: str) -> int:
     cfg_path = Path(config_path)
@@ -51,6 +52,14 @@ def run_once(config_path: str) -> int:
     run_dir = make_run_dir(base_dir, name)
     config_snapshot = write_config_snapshot(run_dir, cfg)
 
+    # Extract causal config if present
+    causal_cfg = cfg.get("causal", {})
+    causal_enabled = causal_cfg.get("enabled", False)
+    causal_weight = causal_cfg.get("weight", 0.0)
+    
+    # Compute causal score if enabled (non-breaking: defaults to None if disabled)
+    causal_score = compute_causal_score(enabled=causal_enabled, weight=causal_weight)
+    
     summary_payload = {
         "run_name": name,
         "protocol": protocol,
@@ -58,6 +67,11 @@ def run_once(config_path: str) -> int:
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "notes": "Minimal run contract smoke step (no model training yet)."
     }
+    
+    # Add causal score to summary if enabled (non-breaking extension)
+    if causal_score is not None:
+        summary_payload["causal_score"] = causal_score
+    
     summary_path = write_summary(run_dir, summary_payload)
 
     append_registry(
