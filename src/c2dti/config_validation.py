@@ -52,7 +52,6 @@ def _validate_model_config(model_cfg: Any) -> List[str]:
 
     errors: List[str] = []
 
-    # Validate matrix_factorization-specific hyperparameters when present
     if "latent_dim" in model_cfg:
         val = model_cfg["latent_dim"]
         if not isinstance(val, int) or val < 1:
@@ -95,6 +94,41 @@ def _validate_perturbation_config(perturbation_cfg: Any) -> List[str]:
 
     return errors
 
+
+def _validate_split_config(split_cfg: Any) -> List[str]:
+    """Validate optional split configuration for train/test evaluation.
+
+    Supported keys:
+      strategy   : one of "random", "cold_drug", "cold_target"  (default: "random")
+      test_ratio : float between 0 and 1 exclusive              (default: 0.2)
+      seed       : integer for reproducibility                   (default: 42)
+    """
+    if split_cfg is None:
+        return []
+
+    if not isinstance(split_cfg, dict):
+        return ["split config must be a mapping"]
+
+    errors: List[str] = []
+
+    valid_strategies = {"random", "cold_drug", "cold_target"}
+    strategy = split_cfg.get("strategy", "random")
+    if not isinstance(strategy, str) or strategy.strip().lower() not in valid_strategies:
+        errors.append(
+            f"split.strategy must be one of: {', '.join(sorted(valid_strategies))}"
+        )
+
+    test_ratio = split_cfg.get("test_ratio", 0.2)
+    if not isinstance(test_ratio, (int, float)) or not (0.0 < float(test_ratio) < 1.0):
+        errors.append("split.test_ratio must be a number strictly between 0 and 1")
+
+    seed = split_cfg.get("seed", 42)
+    if not isinstance(seed, int):
+        errors.append("split.seed must be an integer")
+
+    return errors
+
+
 def validate_config(cfg: Dict[str, Any]) -> List[str]:
     errors: List[str] = []
 
@@ -111,7 +145,6 @@ def validate_config(cfg: Dict[str, Any]) -> List[str]:
     if not isinstance(output, dict) or not output.get("base_dir"):
         errors.append("Missing required key: output.base_dir")
 
-    # Validate optional causal configuration
     causal_cfg = cfg.get("causal")
     causal_errors = validate_causal_config(causal_cfg)
     errors.extend(causal_errors)
@@ -119,5 +152,6 @@ def validate_config(cfg: Dict[str, Any]) -> List[str]:
     errors.extend(_validate_dataset_config(cfg.get("dataset")))
     errors.extend(_validate_model_config(cfg.get("model")))
     errors.extend(_validate_perturbation_config(cfg.get("perturbation")))
+    errors.extend(_validate_split_config(cfg.get("split")))
 
     return errors

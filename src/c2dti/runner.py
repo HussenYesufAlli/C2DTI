@@ -10,7 +10,7 @@ from src.c2dti.dataset_loader import load_dti_dataset
 from src.c2dti.dti_model import create_predictor
 from src.c2dti.evaluation import evaluate_predictions
 from src.c2dti.perturbation import perturb_dataset_interactions
-
+from src.c2dti.splitter import split_dataset
 def dry_run(config_path: str) -> int:
     cfg_path = Path(config_path)
     if not cfg_path.exists():
@@ -86,10 +86,35 @@ def run_once(config_path: str) -> int:
         # Pass the full model config dict so MatrixFactorizationDTIPredictor
         # can read latent_dim, epochs, lr, seed from the YAML file.
         predictor = create_predictor(cfg.get("model", {}))
-        predictions = predictor.fit_predict(dataset)
+        # --- Train/test split ---
+        # If a split config is present, divide the known pairs into train and test sets.
+        # The model trains only on train-set entries; metrics are reported on test-set
+        # entries only (the held-out pairs the model never saw during training).
+        # If no split config is present, the old behaviour is preserved: train and
+        # evaluate on all known pairs (useful for smoke tests and dry-runs).
+        split_cfg = cfg.get("split")
+        train_mask = None
+        test_mask = None
+        if split_cfg and not dataset.metadata.get("is_placeholder", False):
+            train_mask, test_mask = split_dataset(
+                dataset,
+                strategy=split_cfg.get("strategy", "random"),
+                test_ratio=float(split_cfg.get("test_ratio", 0.2)),
+                seed=int(split_cfg.get("seed", 42)),
+            )
+            summary_payload["split"] = {
+                "strategy": split_cfg.get("strategy", "random"),
+                "test_ratio": float(split_cfg.get("test_ratio", 0.2)),
+                "seed": int(split_cfg.get("seed", 42)),
+                "n_train": int(train_mask.sum()),
+                "n_test": int(test_mask.sum()),
+            }
+
+        # Train the model (passing train_mask so it never peeks at test entries)
+        predictions = predictor.fit_predict(dataset, train_mask=train_mask)
         prediction_path = write_prediction_matrix(run_dir, dataset.drugs, dataset.targets, predictions)
 
-        summary_payload["notes"] = "Real DTI pipeline completed with dataset loading, prediction, evaluation, and optional causal reliability."
+        summary_payload["notes"] = "Real DTI pipeline completed with dataset loading, split, prediction, evaluation, and optional causal reliability."
         summary_payload["dataset_name"] = dataset.metadata.get("source", dataset_cfg["name"])
         summary_payload["dataset_placeholder"] = bool(dataset.metadata.get("is_placeholder", False))
         summary_payload["dataset_allow_placeholder"] = allow_placeholder
@@ -98,11 +123,25 @@ def run_once(config_path: str) -> int:
         summary_payload["prediction_path"] = str(prediction_path)
         summary_payload["prediction_stats"] = summarize_matrix(predictions)
 
-        # Evaluate predictions against the ground-truth affinity matrix.
-        # evaluate_predictions automatically skips NaN entries (unknown affinities).
-        summary_payload["evaluation_metrics"] = evaluate_predictions(
-            dataset.interactions, predictions
-        )
+        # --- Evaluation ---
+        # When a split was performed: evaluate ONLY on held-out test-set pairs.
+        # This gives scientifically valid metrics comparable to published results.
+        # When no split: evaluate on all known pairs (backward-compatible).
+        if test_mask is not None:
+            # Extract true and predicted values for test-set pairs only
+            y_true_test = dataset.interactions[test_mask]
+            y_pred_test = predictions[test_mask]
+            summary_payload["evaluation_metrics"] = evaluate_predictions(y_true_test, y_pred_test)
+
+            # Also record training-set fit quality so we can detect overfitting
+            y_true_train = dataset.interactions[train_mask]
+            y_pred_train = predictions[train_mask]
+            summary_payload["train_metrics"] = evaluate_predictions(y_true_train, y_pred_train)
+        else:
+            # No split: evaluate on all known pairs (smoke-test / placeholder mode)
+            summary_payload["evaluation_metrics"] = evaluate_predictions(
+                dataset.interactions, predictions
+            )
 
         # If the predictor was trainable, record its loss curve and save the checkpoint.
         if hasattr(predictor, "train_loss_history") and predictor.train_loss_history:

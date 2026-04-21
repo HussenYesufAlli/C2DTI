@@ -23,8 +23,20 @@ class DTIPredictor(ABC):
     """Abstract interface for DTI predictors used by the runner."""
 
     @abstractmethod
-    def fit_predict(self, dataset: DTIDataset) -> np.ndarray:
-        """Fit the predictor on a dataset and return a prediction matrix."""
+    def fit_predict(
+        self,
+        dataset: DTIDataset,
+        train_mask: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        """Fit the predictor on a dataset and return a prediction matrix.
+
+        Args:
+            dataset    : the full DTI dataset (drugs, targets, interactions).
+            train_mask : optional boolean array of shape (n_drugs, n_targets).
+                         When provided, the model may only observe entries where
+                         train_mask[i, j] is True during training.
+                         If None, all non-NaN entries are used (backward-compatible).
+        """
 
 
 class SimpleMatrixDTIPredictor(DTIPredictor):
@@ -34,15 +46,28 @@ class SimpleMatrixDTIPredictor(DTIPredictor):
     committing to a heavy learning architecture yet.
     """
 
-    def fit_predict(self, dataset: DTIDataset) -> np.ndarray:
-        """Generate a dense prediction matrix from the observed interactions."""
+    def fit_predict(
+        self,
+        dataset: DTIDataset,
+        train_mask: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        """Generate a dense prediction matrix from the observed interactions.
+
+        train_mask restricts which entries are used to compute row/col/global means.
+        If None, all non-NaN entries are used.
+        """
         interactions = dataset.interactions.astype(np.float32)
         if interactions.size == 0:
             return interactions.copy()
 
-        row_means = interactions.mean(axis=1, keepdims=True)
-        col_means = interactions.mean(axis=0, keepdims=True)
-        global_mean = float(interactions.mean())
+        # Apply train_mask: hide test entries so the baseline only uses training pairs
+        if train_mask is not None:
+            interactions = np.where(train_mask, interactions, np.nan)
+
+        # nanmean ignores masked-out (NaN) entries when computing averages
+        row_means = np.nanmean(interactions, axis=1, keepdims=True)
+        col_means = np.nanmean(interactions, axis=0, keepdims=True)
+        global_mean = float(np.nanmean(interactions))
 
         drug_features = build_string_feature_matrix(dataset.drugs)
         target_features = build_string_feature_matrix(dataset.targets)
@@ -107,14 +132,19 @@ class MatrixFactorizationDTIPredictor(DTIPredictor):
         self._target_embeddings: Optional[np.ndarray] = None  # (n_targets, latent_dim)
         self.train_loss_history: List[float] = []             # MSE per epoch
 
-    def fit_predict(self, dataset: DTIDataset) -> np.ndarray:
+    def fit_predict(
+        self,
+        dataset: DTIDataset,
+        train_mask: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
         """Train the factorisation model and return the predicted affinity matrix.
 
         Steps:
           1. Extract the observed affinity matrix Y from the dataset.
-          2. Build a mask of known (non-NaN) entries to train only on real data.
+          2. Build a training mask: either the caller-supplied train_mask, or
+             all non-NaN entries (backward-compatible when no split is used).
           3. Randomly initialise drug embeddings P and target embeddings Q.
-          4. Run gradient descent for `epochs` steps, updating P and Q.
+          4. Run gradient descent on TRAIN entries only for `epochs` steps.
           5. Apply sigmoid to map raw dot-product scores to [0, 1].
           6. Return the full predicted matrix (all drug-target pairs).
         """
@@ -125,9 +155,14 @@ class MatrixFactorizationDTIPredictor(DTIPredictor):
         # Y is the ground-truth affinity matrix, float64 for numerical stability
         Y = dataset.interactions.astype(np.float64)
 
-        # known_mask marks every entry that has a real (non-NaN) value
-        # We only compute loss on these entries; unknown entries are ignored
-        known_mask = ~np.isnan(Y)
+        # Decide which entries the model is allowed to see during training:
+        #   - If train_mask is provided (split was performed), train only on those entries.
+        #   - Otherwise, train on all non-NaN entries (old behaviour, fully backward-compatible).
+        if train_mask is not None:
+            # Combine: entry must be in train_mask AND have a real value
+            known_mask = train_mask & ~np.isnan(Y)
+        else:
+            known_mask = ~np.isnan(Y)
 
         # Initialise small random embeddings to break symmetry
         scale = 0.1
@@ -200,8 +235,8 @@ def create_predictor(model_name_or_cfg: Union[str, Dict]) -> DTIPredictor:
       - a model config dict as read from YAML (preferred for real runs).
 
     Supported model names:
-      "simple_baseline"        → SimpleMatrixDTIPredictor (fast, non-trainable)
-      "matrix_factorization"   → MatrixFactorizationDTIPredictor (trainable)
+      "simple_baseline"        -> SimpleMatrixDTIPredictor (fast, non-trainable)
+      "matrix_factorization"   -> MatrixFactorizationDTIPredictor (trainable)
     """
     # Normalise: accept both string and dict
     if isinstance(model_name_or_cfg, dict):
