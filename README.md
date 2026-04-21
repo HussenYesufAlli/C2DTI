@@ -95,6 +95,9 @@ strict run-once configs in one command.
 Use `make gate-all` as the full quality gate: unit tests, smoke checks, strict
 data prechecks, and strict run-once execution in a single command.
 
+`make gate-all` now writes a JSON evidence report under
+`outputs/gates/gate_all_<timestamp>.json` with step-level pass/fail status.
+
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 ## Current Focus

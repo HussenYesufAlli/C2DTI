@@ -26,4 +26,5 @@ run-once-all:
 
 real-all: check-data-all run-once-all
 
-gate-all: verify real-all
+gate-all:
+	python scripts/gate_all.py
