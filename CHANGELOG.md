@@ -36,6 +36,7 @@ All notable changes to this project will be documented in this file.
 - DAVIS/KIBA dataset precheck now validates sequence file line counts and `Y.txt` shape consistency, and records results in the JSON report.
 - Added `scripts/check_all_data.py` and `make check-data-all` to run strict prechecks for DAVIS/BindingDB/KIBA with one summary.
 - `check-data-all` now reads generated reports and prints a next-actions checklist (missing files/content fixes) per failed config.
+- Strict precheck now rejects BindingDB CSVs with header-only content and DAVIS/KIBA datasets with empty sequence files.
 
 ## [0.1.0] - 2026-04-21
 

@@ -131,6 +131,7 @@ def _validate_bindingdb_content(dataset_path: Path) -> Dict[str, Any]:
     validation: Dict[str, Any] = {
         "status": "skipped",
         "available_columns": [],
+        "num_data_rows": 0,
         "required_columns": ["Drug_ID", "Target_ID", "Y"],
         "optional_alias_columns": {
             "Drug_ID": ["Drug"],
@@ -149,6 +150,7 @@ def _validate_bindingdb_content(dataset_path: Path) -> Dict[str, Any]:
         with dataset_path.open("r", encoding="utf-8", newline="") as handle:
             reader = csv.reader(handle)
             header_row = next(reader, None)
+            data_rows = sum(1 for row in reader if row and any(cell.strip() for cell in row))
     except Exception as exc:
         validation["status"] = "error"
         validation["reason"] = f"Failed to read BindingDB CSV header: {exc}"
@@ -161,6 +163,7 @@ def _validate_bindingdb_content(dataset_path: Path) -> Dict[str, Any]:
 
     available_columns = [column.strip() for column in header_row]
     validation["available_columns"] = available_columns
+    validation["num_data_rows"] = data_rows
 
     resolved_columns: Dict[str, str] = {}
     missing_columns: List[str] = []
@@ -182,6 +185,11 @@ def _validate_bindingdb_content(dataset_path: Path) -> Dict[str, Any]:
     if missing_columns:
         validation["status"] = "error"
         validation["reason"] = "BindingDB CSV is missing required columns"
+        return validation
+
+    if data_rows == 0:
+        validation["status"] = "error"
+        validation["reason"] = "BindingDB CSV has no data rows"
         return validation
 
     validation["status"] = "ok"
@@ -217,6 +225,8 @@ def _matrix_shape(raw_matrix: np.ndarray, n_drugs: int, n_targets: int) -> List[
 
     if raw_matrix.ndim == 1:
         size = int(raw_matrix.shape[0])
+        if size == 0:
+            return [0, 0]
         if n_drugs == 1:
             return [1, size]
         if n_targets == 1:
@@ -259,6 +269,10 @@ def _validate_sequence_matrix_content(dataset_name: str, dataset_path: Path) -> 
             f"Y.txt shape {shape} does not match expected [{n_drugs}, {n_targets}] "
             f"from drug_smiles.txt and target_sequences.txt"
         )
+        return validation
+
+    if n_drugs == 0 or n_targets == 0:
+        validation["reason"] = "drug_smiles.txt or target_sequences.txt has no non-empty rows"
         return validation
 
     validation["status"] = "ok"

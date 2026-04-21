@@ -61,11 +61,13 @@ BindingDB columns and DAVIS/KIBA required file names.
 
 For BindingDB, the precheck also validates the CSV header and records which
 required columns were found, resolved via aliases, or still missing.
+It also requires at least one non-empty data row in the CSV.
 
 For DAVIS/KIBA, the precheck now validates that:
 - line counts in `drug_smiles.txt` and `target_sequences.txt` are readable
 - `Y.txt` can be parsed
 - parsed `Y.txt` shape matches `[num_drugs, num_targets]`
+- non-empty drug/target entries are present (empty files are rejected)
 
 Use `make check-data-all` to run strict prechecks for DAVIS, BindingDB,
 and KIBA in one shot with a compact pass/fail summary.

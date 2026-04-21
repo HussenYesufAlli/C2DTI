@@ -182,10 +182,39 @@ class TestDataCheck(unittest.TestCase):
             report_path = tmp_path / "outputs" / "checks" / "bindingdb_valid_columns_data_check.json"
             report = json.loads(report_path.read_text(encoding="utf-8"))
             self.assertEqual(report["content_validation"]["status"], "ok")
+            self.assertEqual(report["content_validation"]["num_data_rows"], 1)
             self.assertEqual(
                 report["content_validation"]["resolved_columns"],
                 {"Drug_ID": "Drug_ID", "Target_ID": "Target_ID", "Y": "Y"},
             )
+
+    def test_check_data_bindingdb_header_only_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            csv_path = tmp_path / "bindingdb.csv"
+            csv_path.write_text("Drug_ID,Target_ID,Y\n", encoding="utf-8")
+
+            cfg_path = tmp_path / "bindingdb_header_only.yaml"
+            cfg = {
+                "name": "C2DTI_BINDINGDB_HEADER_ONLY",
+                "protocol": "P1",
+                "output": {"base_dir": str(tmp_path / "outputs")},
+                "dataset": {
+                    "name": "BindingDB",
+                    "path": str(csv_path),
+                    "allow_placeholder": False,
+                },
+            }
+            cfg_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+
+            code = check_data(str(cfg_path))
+            self.assertEqual(code, 3)
+
+            report_path = tmp_path / "outputs" / "checks" / "bindingdb_header_only_data_check.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["content_validation"]["status"], "error")
+            self.assertEqual(report["content_validation"]["num_data_rows"], 0)
+            self.assertIn("no data rows", report["content_validation"]["reason"])
 
     def test_check_data_requires_dataset_section(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -207,3 +236,35 @@ class TestDataCheck(unittest.TestCase):
             report = json.loads(report_path.read_text(encoding="utf-8"))
             self.assertEqual(report["status"], "error")
             self.assertEqual(report["exit_code"], 2)
+
+    def test_check_data_davis_empty_files_are_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            data_dir = tmp_path / "davis"
+            data_dir.mkdir(parents=True, exist_ok=True)
+
+            (data_dir / "drug_smiles.txt").write_text("\n", encoding="utf-8")
+            (data_dir / "target_sequences.txt").write_text("\n", encoding="utf-8")
+            (data_dir / "Y.txt").write_text("\n", encoding="utf-8")
+
+            cfg_path = tmp_path / "davis_empty.yaml"
+            cfg = {
+                "name": "C2DTI_DAVIS_EMPTY",
+                "protocol": "P1",
+                "output": {"base_dir": str(tmp_path / "outputs")},
+                "dataset": {
+                    "name": "DAVIS",
+                    "path": str(data_dir),
+                    "allow_placeholder": False,
+                },
+            }
+            cfg_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+
+            code = check_data(str(cfg_path))
+            self.assertEqual(code, 3)
+
+            report_path = tmp_path / "outputs" / "checks" / "davis_empty_data_check.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["content_validation"]["status"], "error")
+            self.assertEqual(report["content_validation"]["num_drugs_from_file"], 0)
+            self.assertEqual(report["content_validation"]["num_targets_from_file"], 0)
