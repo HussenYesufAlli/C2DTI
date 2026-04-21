@@ -47,6 +47,7 @@ Commit in small units, then open a PR from `feature/*` to `dev`.
 make test
 make smoke
 python scripts/run.py --config configs/davis_real_pipeline_strict.yaml --check-data
+make check-data-all
 ```
 
 Use `--check-data` before a strict real run to verify required files and
@@ -65,6 +66,9 @@ For DAVIS/KIBA, the precheck now validates that:
 - line counts in `drug_smiles.txt` and `target_sequences.txt` are readable
 - `Y.txt` can be parsed
 - parsed `Y.txt` shape matches `[num_drugs, num_targets]`
+
+Use `make check-data-all` to run strict prechecks for DAVIS, BindingDB,
+and KIBA in one shot with a compact pass/fail summary.
 
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
