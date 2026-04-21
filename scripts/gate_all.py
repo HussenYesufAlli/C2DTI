@@ -66,6 +66,12 @@ def main() -> None:
         default=None,
         help="Optional explicit path for gate report JSON.",
     )
+    parser.add_argument(
+        "--validate-cmd",
+        nargs="+",
+        default=[sys.executable, "scripts/validate_run_outputs.py"],
+        help="Command tokens for output validation step.",
+    )
     args = parser.parse_args()
 
     report_path = Path(args.report_path) if args.report_path else _default_report_path()
@@ -78,11 +84,33 @@ def main() -> None:
     step_results.append(_run_step("verify", args.verify_cmd))
     if step_results[-1]["return_code"] == 0:
         step_results.append(_run_step("real-all", args.real_cmd))
+        if step_results[-1]["return_code"] == 0:
+            step_results.append(_run_step("validate-outputs", args.validate_cmd))
+        else:
+            step_results.append(
+                {
+                    "name": "validate-outputs",
+                    "command": list(args.validate_cmd),
+                    "return_code": None,
+                    "status": "SKIPPED",
+                    "duration_sec": 0.0,
+                }
+            )
+            print("[INFO] validate-outputs skipped because real-all failed")
     else:
         step_results.append(
             {
                 "name": "real-all",
                 "command": list(args.real_cmd),
+                "return_code": None,
+                "status": "SKIPPED",
+                "duration_sec": 0.0,
+            }
+        )
+        step_results.append(
+            {
+                "name": "validate-outputs",
+                "command": list(args.validate_cmd),
                 "return_code": None,
                 "status": "SKIPPED",
                 "duration_sec": 0.0,

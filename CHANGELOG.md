@@ -43,6 +43,8 @@ All notable changes to this project will be documented in this file.
 - Added `make real-all` to run strict prechecks and strict run-once execution in a single command.
 - Added `make gate-all` to run verify plus full strict real pipeline checks in one quality gate.
 - Added `scripts/gate_all.py`; `make gate-all` now emits `outputs/gates/gate_all_<timestamp>.json` with step-level gate evidence.
+- Added `scripts/validate_run_outputs.py` and `make validate-outputs` to verify latest run artifacts and registry integrity for strict configs.
+- Extended `make gate-all` to include output validation as an enforced third gate step.
 
 ## [0.1.0] - 2026-04-21
 

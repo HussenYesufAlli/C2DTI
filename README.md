@@ -52,6 +52,7 @@ make scaffold-data-layout
 make fill-demo-data
 make run-once-all
 make real-all
+make validate-outputs
 make gate-all
 ```
 
@@ -93,7 +94,12 @@ Use `make real-all` to run strict data prechecks first and then execute all
 strict run-once configs in one command.
 
 Use `make gate-all` as the full quality gate: unit tests, smoke checks, strict
-data prechecks, and strict run-once execution in a single command.
+data prechecks, strict run-once execution, and output artifact validation in a
+single command.
+
+Use `make validate-outputs` to verify that latest run artifacts exist for each
+strict config (`summary.json`, `config_snapshot.yaml`, `predictions.csv`, and
+registry entries).
 
 `make gate-all` now writes a JSON evidence report under
 `outputs/gates/gate_all_<timestamp>.json` with step-level pass/fail status.
