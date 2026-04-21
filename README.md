@@ -53,6 +53,7 @@ make fill-demo-data
 make run-once-all
 make real-all
 make validate-outputs
+make gate-summary
 make gate-all
 ```
 
@@ -100,6 +101,9 @@ single command.
 Use `make validate-outputs` to verify that latest run artifacts exist for each
 strict config (`summary.json`, `config_snapshot.yaml`, `predictions.csv`, and
 registry entries).
+
+Use `make gate-summary` to generate `outputs/gates/latest_gate_summary.md`
+from the latest gate and validation reports and fail if any status is non-pass.
 
 `make gate-all` now writes a JSON evidence report under
 `outputs/gates/gate_all_<timestamp>.json` with step-level pass/fail status.
