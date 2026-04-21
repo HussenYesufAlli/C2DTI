@@ -76,6 +76,12 @@ def run_once(config_path: str) -> int:
     dataset_cfg = cfg.get("dataset")
     if dataset_cfg:
         dataset = load_dti_dataset(dataset_cfg["name"], Path(dataset_cfg["path"]))
+        allow_placeholder = dataset_cfg.get("allow_placeholder", True)
+        if bool(dataset.metadata.get("is_placeholder", False)) and not allow_placeholder:
+            print("[ERROR] Dataset placeholder was used but dataset.allow_placeholder is false")
+            print(f"[ERROR] Please provide real files at: {dataset_cfg.get('path')}")
+            return 3
+
         predictor = create_predictor(cfg.get("model", {}).get("name", "simple_baseline"))
         predictions = predictor.fit_predict(dataset)
         prediction_path = write_prediction_matrix(run_dir, dataset.drugs, dataset.targets, predictions)
@@ -83,6 +89,7 @@ def run_once(config_path: str) -> int:
         summary_payload["notes"] = "Real DTI pipeline completed with dataset loading, prediction, and optional causal reliability."
         summary_payload["dataset_name"] = dataset.metadata.get("source", dataset_cfg["name"])
         summary_payload["dataset_placeholder"] = bool(dataset.metadata.get("is_placeholder", False))
+        summary_payload["dataset_allow_placeholder"] = allow_placeholder
         summary_payload["num_drugs"] = len(dataset.drugs)
         summary_payload["num_targets"] = len(dataset.targets)
         summary_payload["prediction_path"] = str(prediction_path)

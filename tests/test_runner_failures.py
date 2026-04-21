@@ -34,6 +34,25 @@ class TestRunnerFailurePaths(unittest.TestCase):
             code = run_once(str(cfg_path))
             self.assertEqual(code, 2)
 
+    def test_run_once_strict_dataset_missing_returns_3(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg_path = Path(tmp) / "strict_missing_data.yaml"
+            cfg = {
+                "name": "C2DTI_STRICT_DAVIS",
+                "protocol": "P1",
+                "output": {"base_dir": str(Path(tmp) / "outputs")},
+                "dataset": {
+                    "name": "DAVIS",
+                    "path": str(Path(tmp) / "missing_davis"),
+                    "allow_placeholder": False,
+                },
+                "model": {"name": "simple_baseline"},
+                "causal": {"enabled": True, "weight": 1.0},
+            }
+            cfg_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+            code = run_once(str(cfg_path))
+            self.assertEqual(code, 3)
+
 
 if __name__ == "__main__":
     unittest.main()

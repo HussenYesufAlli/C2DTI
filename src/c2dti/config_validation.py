@@ -22,6 +22,10 @@ def _validate_dataset_config(dataset_cfg: Any) -> List[str]:
     if not dataset_cfg.get("path"):
         errors.append("dataset.path is required when dataset config is provided")
 
+    allow_placeholder = dataset_cfg.get("allow_placeholder", True)
+    if not isinstance(allow_placeholder, bool):
+        errors.append("dataset.allow_placeholder must be a boolean")
+
     return errors
 
 
