@@ -51,6 +51,7 @@ make check-data-all
 make scaffold-data-layout
 make fill-demo-data
 make run-once-all
+make real-all
 ```
 
 Use `--check-data` before a strict real run to verify required files and
@@ -86,6 +87,9 @@ content that satisfies strict checks for quick pipeline validation.
 
 Use `make run-once-all` to execute all strict configs once and get a compact
 pass/fail summary for end-to-end run contracts.
+
+Use `make real-all` to run strict data prechecks first and then execute all
+strict run-once configs in one command.
 
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
