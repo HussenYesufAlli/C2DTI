@@ -24,6 +24,9 @@ All notable changes to this project will be documented in this file.
 - **Non-breaking causal objective hook**: optional `causal` config section with `enabled` and `weight` keys; when enabled, computes placeholder causal score and includes it in run summary.
 - Causal objective module with validation, score computation, and comprehensive unit tests (8 new tests, all passing).
 - Example config `configs/causal_enabled.yaml` showing causal feature usage.
+- Optional real DTI pipeline path with dataset loaders for BindingDB, DAVIS, and KIBA.
+- Simple baseline DTI predictor, prediction CSV artifact output, and perturbation-based causal reliability scoring.
+- Example real-pipeline config `configs/davis_real_pipeline.yaml` and integration coverage for end-to-end dataset-to-output execution.
 
 ## [0.1.0] - 2026-04-21
 
