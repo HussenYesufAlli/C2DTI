@@ -49,6 +49,7 @@ make smoke
 python scripts/run.py --config configs/davis_real_pipeline_strict.yaml --check-data
 make check-data-all
 make scaffold-data-layout
+make fill-demo-data
 ```
 
 Use `--check-data` before a strict real run to verify required files and
@@ -78,6 +79,9 @@ derived from JSON reports (for example, exact missing file paths to create).
 
 Use `make scaffold-data-layout` to create the required `data/` file structure
 quickly before filling real dataset contents.
+
+Use `make fill-demo-data` to populate scaffolded files with minimal synthetic
+content that satisfies strict checks for quick pipeline validation.
 
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
