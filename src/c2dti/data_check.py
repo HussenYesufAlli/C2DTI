@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import yaml
 
 from src.c2dti.config_validation import validate_config
@@ -194,10 +195,75 @@ def _validate_dataset_content(dataset_name: str, dataset_path: Path) -> Dict[str
     if normalized_name == "BINDINGDB":
         return _validate_bindingdb_content(dataset_path)
 
+    if normalized_name in {"DAVIS", "KIBA"}:
+        return _validate_sequence_matrix_content(normalized_name, dataset_path)
+
     return {
         "status": "skipped",
         "reason": f"No additional content validation implemented for {dataset_name}",
     }
+
+
+def _count_non_empty_lines(path: Path) -> int:
+    """Count non-empty lines in a text file."""
+    with path.open("r", encoding="utf-8") as handle:
+        return sum(1 for line in handle if line.strip())
+
+
+def _matrix_shape(raw_matrix: np.ndarray, n_drugs: int, n_targets: int) -> List[int]:
+    """Infer matrix shape robustly for loadtxt outputs, including 1D edge cases."""
+    if raw_matrix.ndim == 0:
+        return [1, 1]
+
+    if raw_matrix.ndim == 1:
+        size = int(raw_matrix.shape[0])
+        if n_drugs == 1:
+            return [1, size]
+        if n_targets == 1:
+            return [size, 1]
+        return [1, size]
+
+    return [int(raw_matrix.shape[0]), int(raw_matrix.shape[1])]
+
+
+def _validate_sequence_matrix_content(dataset_name: str, dataset_path: Path) -> Dict[str, Any]:
+    """Validate DAVIS/KIBA content: line counts and Y matrix shape consistency."""
+    drug_file = dataset_path / "drug_smiles.txt"
+    target_file = dataset_path / "target_sequences.txt"
+    y_file = dataset_path / "Y.txt"
+
+    validation: Dict[str, Any] = {
+        "status": "error",
+        "dataset": dataset_name,
+        "num_drugs_from_file": 0,
+        "num_targets_from_file": 0,
+        "y_matrix_shape": [0, 0],
+        "reason": "Sequence-matrix validation not completed",
+    }
+
+    try:
+        n_drugs = _count_non_empty_lines(drug_file)
+        n_targets = _count_non_empty_lines(target_file)
+        raw_matrix = np.loadtxt(y_file, dtype=np.float32)
+    except Exception as exc:
+        validation["reason"] = f"Failed to parse sequence/matrix files: {exc}"
+        return validation
+
+    shape = _matrix_shape(raw_matrix, n_drugs=n_drugs, n_targets=n_targets)
+    validation["num_drugs_from_file"] = n_drugs
+    validation["num_targets_from_file"] = n_targets
+    validation["y_matrix_shape"] = shape
+
+    if shape != [n_drugs, n_targets]:
+        validation["reason"] = (
+            f"Y.txt shape {shape} does not match expected [{n_drugs}, {n_targets}] "
+            f"from drug_smiles.txt and target_sequences.txt"
+        )
+        return validation
+
+    validation["status"] = "ok"
+    validation["reason"] = "Sequence counts and Y.txt shape are consistent"
+    return validation
 
 
 def _emit_report(report_path: Optional[Path], payload: Dict[str, Any]) -> None:

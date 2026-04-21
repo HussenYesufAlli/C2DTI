@@ -33,6 +33,7 @@ All notable changes to this project will be documented in this file.
 - Dataset precheck now writes reusable JSON reports under `outputs/checks/` with file status and dataset summary.
 - Dataset precheck reports now include dataset-specific schema details to guide data preparation.
 - BindingDB dataset precheck now validates CSV headers and records available, resolved, and missing columns in the JSON report.
+- DAVIS/KIBA dataset precheck now validates sequence file line counts and `Y.txt` shape consistency, and records results in the JSON report.
 
 ## [0.1.0] - 2026-04-21
 

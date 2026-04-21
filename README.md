@@ -61,6 +61,11 @@ BindingDB columns and DAVIS/KIBA required file names.
 For BindingDB, the precheck also validates the CSV header and records which
 required columns were found, resolved via aliases, or still missing.
 
+For DAVIS/KIBA, the precheck now validates that:
+- line counts in `drug_smiles.txt` and `target_sequences.txt` are readable
+- `Y.txt` can be parsed
+- parsed `Y.txt` shape matches `[num_drugs, num_targets]`
+
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 ## Current Focus
