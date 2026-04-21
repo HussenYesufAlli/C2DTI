@@ -3,8 +3,12 @@ from datetime import datetime
 import yaml
 
 from src.c2dti.config_validation import validate_config
-from src.c2dti.output_io import make_run_dir, write_summary, write_config_snapshot, append_registry
-from src.c2dti.causal_objective import compute_causal_score
+from src.c2dti.output_io import make_run_dir, write_summary, write_config_snapshot, append_registry, write_prediction_matrix
+from src.c2dti.causal_objective import compute_causal_score, compute_causal_reliability_score
+from src.c2dti.data_utils import summarize_matrix
+from src.c2dti.dataset_loader import load_dti_dataset
+from src.c2dti.dti_model import create_predictor
+from src.c2dti.perturbation import perturb_dataset_interactions
 
 def dry_run(config_path: str) -> int:
     cfg_path = Path(config_path)
@@ -26,6 +30,11 @@ def dry_run(config_path: str) -> int:
     print(f"name={cfg.get('name')}")
     print(f"protocol={cfg.get('protocol')}")
     print(f"output.base_dir={cfg.get('output', {}).get('base_dir')}")
+    if cfg.get("dataset"):
+        print(f"dataset.name={cfg.get('dataset', {}).get('name')}")
+        print(f"dataset.path={cfg.get('dataset', {}).get('path')}")
+    if cfg.get("model"):
+        print(f"model.name={cfg.get('model', {}).get('name', 'simple_baseline')}")
     print(f"config={cfg_path}")
     return 0
 
@@ -52,14 +61,10 @@ def run_once(config_path: str) -> int:
     run_dir = make_run_dir(base_dir, name)
     config_snapshot = write_config_snapshot(run_dir, cfg)
 
-    # Extract causal config if present
     causal_cfg = cfg.get("causal", {})
     causal_enabled = causal_cfg.get("enabled", False)
     causal_weight = causal_cfg.get("weight", 0.0)
-    
-    # Compute causal score if enabled (non-breaking: defaults to None if disabled)
-    causal_score = compute_causal_score(enabled=causal_enabled, weight=causal_weight)
-    
+
     summary_payload = {
         "run_name": name,
         "protocol": protocol,
@@ -67,10 +72,39 @@ def run_once(config_path: str) -> int:
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "notes": "Minimal run contract smoke step (no model training yet)."
     }
-    
-    # Add causal score to summary if enabled (non-breaking extension)
-    if causal_score is not None:
-        summary_payload["causal_score"] = causal_score
+
+    dataset_cfg = cfg.get("dataset")
+    if dataset_cfg:
+        dataset = load_dti_dataset(dataset_cfg["name"], Path(dataset_cfg["path"]))
+        predictor = create_predictor(cfg.get("model", {}).get("name", "simple_baseline"))
+        predictions = predictor.fit_predict(dataset)
+        prediction_path = write_prediction_matrix(run_dir, dataset.drugs, dataset.targets, predictions)
+
+        summary_payload["notes"] = "Real DTI pipeline completed with dataset loading, prediction, and optional causal reliability."
+        summary_payload["dataset_name"] = dataset.metadata.get("source", dataset_cfg["name"])
+        summary_payload["dataset_placeholder"] = bool(dataset.metadata.get("is_placeholder", False))
+        summary_payload["num_drugs"] = len(dataset.drugs)
+        summary_payload["num_targets"] = len(dataset.targets)
+        summary_payload["prediction_path"] = str(prediction_path)
+        summary_payload["prediction_stats"] = summarize_matrix(predictions)
+
+        if causal_enabled:
+            perturbation_cfg = cfg.get("perturbation", {})
+            perturbed_dataset = perturb_dataset_interactions(
+                dataset,
+                strength=perturbation_cfg.get("strength", 0.1),
+                seed=perturbation_cfg.get("seed", 42),
+            )
+            perturbed_predictions = predictor.fit_predict(perturbed_dataset)
+            summary_payload["causal_score"] = compute_causal_reliability_score(
+                baseline_predictions=predictions,
+                perturbed_predictions=perturbed_predictions,
+                weight=causal_weight if causal_weight > 0 else 1.0,
+            )
+    else:
+        causal_score = compute_causal_score(enabled=causal_enabled, weight=causal_weight)
+        if causal_score is not None:
+            summary_payload["causal_score"] = causal_score
     
     summary_path = write_summary(run_dir, summary_payload)
 

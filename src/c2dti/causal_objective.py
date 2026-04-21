@@ -1,18 +1,8 @@
-"""
-Causal objective module for C2DTI.
-
-Purpose:
-  Provides an optional causal consistency objective that can be enabled
-  in configuration without breaking baseline behavior. When disabled,
-  the baseline runs unchanged. When enabled, computes a placeholder
-  causal consistency score and logs it.
-
-Non-breaking design:
-  - Baseline behavior is preserved when causal objective is disabled.
-  - Can be extended later with real causal computations.
-"""
+"""Causal objective helpers for the C2DTI pipeline."""
 
 from typing import Dict, Any, Optional
+
+import numpy as np
 
 
 def validate_causal_config(causal_cfg: Optional[Dict[str, Any]]) -> list:
@@ -71,3 +61,26 @@ def compute_causal_score(
     placeholder_score = 0.5
     
     return placeholder_score
+
+
+def compute_causal_reliability_score(
+    baseline_predictions: np.ndarray,
+    perturbed_predictions: np.ndarray,
+    weight: float = 1.0,
+) -> float:
+    """Measure how stable predictions remain after perturbation.
+
+    A smaller change between baseline and perturbed predictions means the
+    predictor is more reliable under intervention-style stress.
+    """
+    if baseline_predictions.shape != perturbed_predictions.shape:
+        raise ValueError("baseline and perturbed predictions must have the same shape")
+
+    if baseline_predictions.size == 0:
+        return 0.0
+
+    # Use mean absolute change as the instability term, then convert it to a
+    # bounded reliability score in [0, 1].
+    mean_abs_shift = float(np.mean(np.abs(baseline_predictions - perturbed_predictions)))
+    scaled_shift = min(1.0, max(0.0, mean_abs_shift * max(weight, 0.0)))
+    return float(1.0 - scaled_shift)
