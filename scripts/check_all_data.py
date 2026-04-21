@@ -1,8 +1,11 @@
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+import yaml
 
 
 DEFAULT_CONFIGS = [
@@ -24,6 +27,77 @@ def _run_check(config_path: str) -> int:
     cmd = [sys.executable, "scripts/run.py", "--config", config_path, "--check-data"]
     completed = subprocess.run(cmd, check=False)
     return int(completed.returncode)
+
+
+def _report_path_for_config(config_path: str) -> Optional[Path]:
+    """Resolve expected JSON report path for one config file."""
+    cfg_path = Path(config_path)
+    if not cfg_path.exists():
+        return None
+
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return None
+
+    base_dir = Path(cfg.get("output", {}).get("base_dir", "outputs"))
+    return base_dir / "checks" / f"{cfg_path.stem}_data_check.json"
+
+
+def _load_report(report_path: Optional[Path]) -> Optional[Dict[str, Any]]:
+    """Load one JSON report if available."""
+    if report_path is None or not report_path.exists():
+        return None
+
+    try:
+        return json.loads(report_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _print_next_actions(results: List[Tuple[str, int]]) -> None:
+    """Print a compact actionable checklist from generated reports."""
+    failed_results = [(config, code) for config, code in results if code != 0]
+    if not failed_results:
+        print("[INFO] No follow-up actions required")
+        return
+
+    print("\n[INFO] ===== next actions checklist =====")
+    for config, _ in failed_results:
+        report_path = _report_path_for_config(config)
+        report = _load_report(report_path)
+
+        print(f"[INFO] config={config}")
+        if report is None:
+            print("- Re-run check and inspect terminal output (report not found or unreadable)")
+            if report_path is not None:
+                print(f"- Expected report path: {report_path}")
+            continue
+
+        reason = report.get("reason")
+        if reason:
+            print(f"- Reason: {reason}")
+
+        missing_files = report.get("missing_files", [])
+        if missing_files:
+            for missing_file in missing_files:
+                print(f"- Create file: {missing_file}")
+            continue
+
+        content_validation = report.get("content_validation", {})
+        if content_validation.get("status") == "error":
+            content_reason = content_validation.get("reason")
+            if content_reason:
+                print(f"- Fix data content: {content_reason}")
+
+            missing_columns = content_validation.get("missing_columns", [])
+            for column in missing_columns:
+                print(f"- Add missing column: {column}")
+            continue
+
+        print("- Inspect report details for remediation")
+        if report_path is not None:
+            print(f"- Report path: {report_path}")
 
 
 def main() -> None:
@@ -55,9 +129,11 @@ def main() -> None:
 
     if failed == 0:
         print("[OK] All strict dataset prechecks passed")
+        _print_next_actions(results)
         raise SystemExit(0)
 
     print(f"[ERROR] {failed}/{len(results)} strict prechecks failed")
+    _print_next_actions(results)
     raise SystemExit(1)
 
 

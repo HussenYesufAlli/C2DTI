@@ -49,6 +49,7 @@ class TestCheckAllDataScript(unittest.TestCase):
             self.assertEqual(completed.returncode, 0)
             self.assertIn("PASS code=0", completed.stdout)
             self.assertIn("All strict dataset prechecks passed", completed.stdout)
+            self.assertIn("No follow-up actions required", completed.stdout)
 
     def test_check_all_data_returns_1_when_any_config_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -83,3 +84,5 @@ class TestCheckAllDataScript(unittest.TestCase):
             self.assertEqual(completed.returncode, 1)
             self.assertIn("FAIL code=3", completed.stdout)
             self.assertIn("strict prechecks failed", completed.stdout)
+            self.assertIn("next actions checklist", completed.stdout)
+            self.assertIn("Create file:", completed.stdout)

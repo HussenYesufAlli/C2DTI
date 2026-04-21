@@ -70,6 +70,9 @@ For DAVIS/KIBA, the precheck now validates that:
 Use `make check-data-all` to run strict prechecks for DAVIS, BindingDB,
 and KIBA in one shot with a compact pass/fail summary.
 
+When checks fail, `make check-data-all` now prints a next-actions checklist
+derived from JSON reports (for example, exact missing file paths to create).
+
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 ## Current Focus
