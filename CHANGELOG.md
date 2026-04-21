@@ -46,6 +46,7 @@ All notable changes to this project will be documented in this file.
 - Added `scripts/validate_run_outputs.py` and `make validate-outputs` to verify latest run artifacts and registry integrity for strict configs.
 - Extended `make gate-all` to include output validation as an enforced third gate step.
 - Added `scripts/gate_summary.py` and `make gate-summary` to generate `outputs/gates/latest_gate_summary.md` from latest gate evidence.
+- Added `.github/workflows/gate.yml` to enforce `make gate-all` and `make gate-summary` on push/PR and upload gate evidence artifacts.
 
 ## [0.1.0] - 2026-04-21
 

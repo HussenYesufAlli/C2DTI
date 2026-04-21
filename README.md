@@ -5,6 +5,7 @@ Cross-view Causal DTI (C2DTI) is a research repository for drug-target interacti
 ## Status
 
 [![Tests](https://github.com/HussenYesufAlli/C2DTI/actions/workflows/tests.yml/badge.svg)](https://github.com/HussenYesufAlli/C2DTI/actions/workflows/tests.yml)
+[![Gate](https://github.com/HussenYesufAlli/C2DTI/actions/workflows/gate.yml/badge.svg)](https://github.com/HussenYesufAlli/C2DTI/actions/workflows/gate.yml)
 [![Branch](https://img.shields.io/badge/branch-dev-blue)](https://github.com/HussenYesufAlli/C2DTI/tree/dev)
 [![PR%20Policy](https://img.shields.io/badge/PR-feature%2F*%20to%20dev-informational)](https://github.com/HussenYesufAlli/C2DTI/blob/main/docs/REPO_WORKFLOW.md)
 
@@ -40,6 +41,9 @@ git checkout -b feature/<task-name>
 ```
 
 Commit in small units, then open a PR from `feature/*` to `dev`.
+
+CI now enforces `make gate-all` and `make gate-summary` on push/PR via
+`.github/workflows/gate.yml`; treat a green gate check as required before merge.
 
 ## Common Commands
 
