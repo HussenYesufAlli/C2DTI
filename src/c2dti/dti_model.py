@@ -1,10 +1,10 @@
 """DTI predictor interfaces and implementations.
 
-Two predictors are provided:
-  - SimpleMatrixDTIPredictor  : fast non-trainable baseline using row/col means.
-  - MatrixFactorizationDTIPredictor : trainable bilinear model that learns
-    low-dimensional drug and target embeddings via gradient descent on MSE loss.
-    This is the first real learnable component in the C2DTI pipeline.
+Available predictors:
+    - SimpleMatrixDTIPredictor: fast non-trainable baseline using row/col means.
+    - MatrixFactorizationDTIPredictor: trainable bilinear model.
+    - MixHopPropagationDTIPredictor: MixHop-style multi-hop propagation baseline.
+    - InteractionCrossAttentionDTIPredictor: interaction-aware cross-attention multimodal model.
 """
 
 from __future__ import annotations
@@ -17,6 +17,64 @@ import numpy as np
 
 from src.c2dti.data_utils import build_string_feature_matrix
 from src.c2dti.dataset_loader import DTIDataset
+
+
+def _row_softmax(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+    """Numerically stable row-wise softmax."""
+    shifted = x - np.max(x, axis=1, keepdims=True)
+    ex = np.exp(np.clip(shifted, -50.0, 50.0))
+    denom = np.sum(ex, axis=1, keepdims=True)
+    denom = np.maximum(denom, eps)
+    return ex / denom
+
+
+def _row_normalize(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+    """Convert matrix rows to probability mass, preserving zeros."""
+    denom = np.sum(x, axis=1, keepdims=True)
+    denom = np.maximum(denom, eps)
+    return x / denom
+
+
+def _cosine_affinity(features: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+    """Build cosine similarity matrix from feature matrix."""
+    x = np.asarray(features, dtype=np.float64)
+    norms = np.linalg.norm(x, axis=1, keepdims=True)
+    x = x / np.maximum(norms, eps)
+    sim = x @ x.T
+    sim = np.clip(sim, 0.0, 1.0)
+    return sim
+
+
+def _topk_adjacency(sim: np.ndarray, top_k: int) -> np.ndarray:
+    """Keep top-k neighbors per row and return row-normalized adjacency."""
+    n = sim.shape[0]
+    k = int(max(1, min(top_k, max(1, n - 1))))
+    adj = np.zeros_like(sim, dtype=np.float64)
+    for i in range(n):
+        row = sim[i].copy()
+        row[i] = 0.0
+        if k < n:
+            idx = np.argpartition(row, -k)[-k:]
+        else:
+            idx = np.arange(n)
+        adj[i, idx] = row[idx]
+    return _row_normalize(adj)
+
+
+def _prepare_training_view(y: np.ndarray, train_mask: Optional[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+    """Create training matrix and known-mask view used by multiple predictors."""
+    y = np.asarray(y, dtype=np.float64)
+    if train_mask is not None:
+        known_mask = train_mask & ~np.isnan(y)
+    else:
+        known_mask = ~np.isnan(y)
+
+    if int(known_mask.sum()) == 0:
+        return np.zeros_like(y, dtype=np.float64), known_mask
+
+    global_mean = float(np.nanmean(y[known_mask]))
+    y_train = np.where(known_mask, y, global_mean)
+    return y_train, known_mask
 
 
 class DTIPredictor(ABC):
@@ -227,6 +285,145 @@ class MatrixFactorizationDTIPredictor(DTIPredictor):
         return checkpoint_path
 
 
+class MixHopPropagationDTIPredictor(DTIPredictor):
+    """MixHop-style propagation baseline for drug-target matrices.
+
+    Beginner view:
+    - Build a drug similarity graph and a target similarity graph.
+    - Propagate known interactions through multiple hops (0, 1, 2, ...).
+    - Blend hop outputs with learned-style fixed weights.
+    """
+
+    def __init__(
+        self,
+        top_k: int = 8,
+        hop_weights: Optional[List[float]] = None,
+    ) -> None:
+        self.top_k = int(max(1, top_k))
+        self.hop_weights = hop_weights if hop_weights is not None else [0.6, 0.3, 0.1]
+
+    def fit_predict(
+        self,
+        dataset: DTIDataset,
+        train_mask: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        y = dataset.interactions.astype(np.float64)
+        if y.size == 0:
+            return y.astype(np.float32)
+
+        y_train, _ = _prepare_training_view(y, train_mask)
+
+        drug_features = build_string_feature_matrix(dataset.drugs)
+        target_features = build_string_feature_matrix(dataset.targets)
+        drug_adj = _topk_adjacency(_cosine_affinity(drug_features), top_k=self.top_k)
+        target_adj = _topk_adjacency(_cosine_affinity(target_features), top_k=self.top_k)
+
+        n_drugs = drug_adj.shape[0]
+        n_targets = target_adj.shape[0]
+        drug_power = np.eye(n_drugs, dtype=np.float64)
+        target_power = np.eye(n_targets, dtype=np.float64)
+
+        weights = np.asarray(self.hop_weights, dtype=np.float64)
+        if weights.size == 0:
+            weights = np.asarray([1.0], dtype=np.float64)
+        weights = weights / np.maximum(weights.sum(), 1e-12)
+
+        pred = np.zeros_like(y_train, dtype=np.float64)
+        for w in weights:
+            pred += float(w) * (drug_power @ y_train @ target_power.T)
+            drug_power = drug_power @ drug_adj
+            target_power = target_power @ target_adj
+
+        return np.clip(pred, 0.0, 1.0).astype(np.float32)
+
+
+class InteractionCrossAttentionDTIPredictor(DTIPredictor):
+    """Interaction-aware cross-attention multimodal predictor.
+
+    This model fuses two signals on the same train split:
+    1) a matrix-factorization interaction score,
+    2) a cross-attention interaction prior computed from drug/target features.
+    """
+
+    def __init__(
+        self,
+        latent_dim: int = 32,
+        epochs: int = 100,
+        lr: float = 0.01,
+        seed: int = 42,
+        attention_temperature: float = 1.0,
+        top_k: int = 8,
+    ) -> None:
+        self.latent_dim = int(max(1, latent_dim))
+        self.epochs = int(max(1, epochs))
+        self.lr = float(lr)
+        self.seed = int(seed)
+        self.attention_temperature = float(max(1e-6, attention_temperature))
+        self.top_k = int(max(1, top_k))
+
+    def fit_predict(
+        self,
+        dataset: DTIDataset,
+        train_mask: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        y = dataset.interactions.astype(np.float64)
+        if y.size == 0:
+            return y.astype(np.float32)
+
+        y_train, known_mask = _prepare_training_view(y, train_mask)
+
+        # Branch A: trainable matrix-factorization interaction score.
+        mf = MatrixFactorizationDTIPredictor(
+            latent_dim=self.latent_dim,
+            epochs=self.epochs,
+            lr=self.lr,
+            seed=self.seed,
+        )
+        mf_score = mf.fit_predict(dataset, train_mask=train_mask).astype(np.float64)
+
+        # Branch B: interaction-aware cross-attention over modality features.
+        drug_features = build_string_feature_matrix(dataset.drugs).astype(np.float64)
+        target_features = build_string_feature_matrix(dataset.targets).astype(np.float64)
+        rng = np.random.RandomState(self.seed)
+
+        w_q = rng.randn(drug_features.shape[1], self.latent_dim) * 0.1
+        w_k = rng.randn(target_features.shape[1], self.latent_dim) * 0.1
+
+        q = np.tanh(drug_features @ w_q)
+        k = np.tanh(target_features @ w_k)
+
+        scale = np.sqrt(float(self.latent_dim)) * self.attention_temperature
+        logits = (q @ k.T) / max(scale, 1e-8)
+
+        attn_drug_to_target = _row_softmax(logits)
+        attn_target_to_drug = _row_softmax(logits.T).T
+        attn = 0.5 * (attn_drug_to_target + attn_target_to_drug)
+
+        # Top-k sparsification keeps the interaction prior focused.
+        if self.top_k > 0:
+            n_targets = attn.shape[1]
+            k_keep = int(max(1, min(self.top_k, n_targets)))
+            sparse_attn = np.zeros_like(attn)
+            for i in range(attn.shape[0]):
+                idx = np.argpartition(attn[i], -k_keep)[-k_keep:]
+                sparse_attn[i, idx] = attn[i, idx]
+            attn = _row_normalize(sparse_attn)
+
+        # Calibrate branch fusion on training entries only.
+        if int(known_mask.sum()) == 0:
+            return np.clip(mf_score, 0.0, 1.0).astype(np.float32)
+
+        x1 = mf_score[known_mask]
+        x2 = attn[known_mask]
+        y_obs = y_train[known_mask]
+
+        x = np.stack([np.ones_like(x1), x1, x2], axis=1)
+        beta, *_ = np.linalg.lstsq(x, y_obs, rcond=None)
+
+        pred = beta[0] + beta[1] * mf_score + beta[2] * attn
+        return np.clip(pred, 0.0, 1.0).astype(np.float32)
+
+
 def create_predictor(model_name_or_cfg: Union[str, Dict]) -> DTIPredictor:
     """Create the configured predictor implementation.
 
@@ -237,6 +434,8 @@ def create_predictor(model_name_or_cfg: Union[str, Dict]) -> DTIPredictor:
     Supported model names:
       "simple_baseline"        -> SimpleMatrixDTIPredictor (fast, non-trainable)
       "matrix_factorization"   -> MatrixFactorizationDTIPredictor (trainable)
+            "mixhop_propagation"     -> MixHopPropagationDTIPredictor
+            "interaction_cross_attention" -> InteractionCrossAttentionDTIPredictor
     """
     # Normalise: accept both string and dict
     if isinstance(model_name_or_cfg, dict):
@@ -259,7 +458,23 @@ def create_predictor(model_name_or_cfg: Union[str, Dict]) -> DTIPredictor:
             seed=int(model_cfg.get("seed", 42)),
         )
 
+    if normalized_name == "mixhop_propagation":
+        return MixHopPropagationDTIPredictor(
+            top_k=int(model_cfg.get("top_k", 8)),
+            hop_weights=list(model_cfg.get("hop_weights", [0.6, 0.3, 0.1])),
+        )
+
+    if normalized_name == "interaction_cross_attention":
+        return InteractionCrossAttentionDTIPredictor(
+            latent_dim=int(model_cfg.get("latent_dim", 32)),
+            epochs=int(model_cfg.get("epochs", 100)),
+            lr=float(model_cfg.get("lr", 0.01)),
+            seed=int(model_cfg.get("seed", 42)),
+            attention_temperature=float(model_cfg.get("attention_temperature", 1.0)),
+            top_k=int(model_cfg.get("top_k", 8)),
+        )
+
     raise ValueError(
         f"Unsupported model.name: {model_name!r}. "
-        "Must be one of: simple_baseline, matrix_factorization"
+        "Must be one of: simple_baseline, matrix_factorization, mixhop_propagation, interaction_cross_attention"
     )
