@@ -1,0 +1,20 @@
+name: C2DTI_BINDINGDB_INTERACTION_CROSS_ATTN_PARITY_S10
+protocol: P1
+output:
+  base_dir: outputs
+dataset:
+  name: BindingDB
+  path: data/bindingdb/bindingdb.csv
+  allow_placeholder: true
+model:
+  name: interaction_cross_attention
+  latent_dim: 16
+  epochs: 5
+  lr: 0.01
+  seed: 10
+  attention_temperature: 1.0
+  top_k: 8
+split:
+  strategy: random
+  test_ratio: 0.2
+  seed: 10

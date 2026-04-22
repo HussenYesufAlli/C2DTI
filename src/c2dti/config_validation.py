@@ -35,6 +35,9 @@ def _validate_model_config(model_cfg: Any) -> List[str]:
     Supported model names and their config keys:
       simple_baseline      : no additional keys required
       matrix_factorization : latent_dim (int), epochs (int), lr (float), seed (int)
+            mixhop_propagation   : top_k (int), hop_weights (list[float])
+            interaction_cross_attention : latent_dim (int), epochs (int), lr (float),
+                                                                        seed (int), attention_temperature (float), top_k (int)
     """
     if model_cfg is None:
         return []
@@ -46,7 +49,12 @@ def _validate_model_config(model_cfg: Any) -> List[str]:
     if not isinstance(model_name, str):
         return ["model.name must be a string"]
 
-    valid_names = {"simple_baseline", "matrix_factorization"}
+    valid_names = {
+        "simple_baseline",
+        "matrix_factorization",
+        "mixhop_propagation",
+        "interaction_cross_attention",
+    }
     if model_name.strip().lower() not in valid_names:
         return [f"model.name must be one of: {', '.join(sorted(valid_names))}"]
 
@@ -71,6 +79,23 @@ def _validate_model_config(model_cfg: Any) -> List[str]:
         val = model_cfg["seed"]
         if not isinstance(val, int):
             errors.append("model.seed must be an integer")
+
+    if "attention_temperature" in model_cfg:
+        val = model_cfg["attention_temperature"]
+        if not isinstance(val, (int, float)) or float(val) <= 0.0:
+            errors.append("model.attention_temperature must be a positive number")
+
+    if "top_k" in model_cfg:
+        val = model_cfg["top_k"]
+        if not isinstance(val, int) or val < 1:
+            errors.append("model.top_k must be a positive integer")
+
+    if "hop_weights" in model_cfg:
+        val = model_cfg["hop_weights"]
+        if not isinstance(val, list) or len(val) == 0:
+            errors.append("model.hop_weights must be a non-empty list of numbers")
+        elif any((not isinstance(v, (int, float)) or float(v) < 0.0) for v in val):
+            errors.append("model.hop_weights entries must be non-negative numbers")
 
     return errors
 

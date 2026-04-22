@@ -118,6 +118,12 @@ Use `make gate-bundle` to package latest gate evidence into
 
 For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
+For MixHop-to-C2DTI migration decisions, use
+[docs/MIXHOP_TO_C2DTI_MIGRATION_GATE.md](docs/MIXHOP_TO_C2DTI_MIGRATION_GATE.md).
+
+For C2DTI-side parity execution tracking, use
+[docs/C2DTI_GRAPH_PARITY_TRACKER_2026-04-22.md](docs/C2DTI_GRAPH_PARITY_TRACKER_2026-04-22.md).
+
 ## Current Focus
 
 Initial scaffold is complete. Next implementation phase is controlled integration and evaluation of the cross-view causal agreement objective.
