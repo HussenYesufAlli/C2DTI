@@ -1,0 +1,63 @@
+name: C2DTI_DAVIS_UNIFIED_CAUSAL_GATE
+protocol: P1
+output:
+  base_dir: outputs
+dataset:
+  name: DAVIS
+  path: data/davis
+  allow_placeholder: true
+model:
+  # Main prediction model for standard evaluation metrics (CI, RMSE, Pearson).
+  name: interaction_cross_attention
+  latent_dim: 16
+  epochs: 5
+  lr: 0.01
+  seed: 42
+  attention_temperature: 1.0
+  top_k: 8
+split:
+  strategy: random
+  test_ratio: 0.2
+  seed: 42
+perturbation:
+  strength: 0.10
+  seed: 42
+causal:
+  enabled: true
+  mode: unified        # ← Phase 5: runs ALL 4 pillars together
+  weight: 1.0
+
+  # Lambda weights for each pillar.
+  # Set any lambda to 0 to ablate that pillar (useful for Phase 6 ablations).
+  lambda_xview: 1.0    # Pillar 2: cross-view consistency
+  lambda_mas:   1.0    # Pillar 3: masked autoencoder reconstruction
+  lambda_irm:   1.0    # Pillar 4: invariant risk minimization
+  lambda_cf:    1.0    # Pillar 4: counterfactual rejection
+
+  # Pillar 2 sub-configs
+  sequence_model:
+    name: dual_frozen_backbone
+    fusion_alpha: 0.7
+    seed: 42
+  graph_model:
+    name: mixhop_propagation
+    top_k: 8
+    hop_weights: [0.6, 0.3, 0.1]
+
+  # Pillar 3 sub-config
+  mas_config:
+    drug_npz_path: null    # null = hash fallback; set to real ChemBERTa NPZ when available
+    prot_npz_path: null    # null = hash fallback; set to real ANKH NPZ when available
+    embedding_dim: 768
+    mask_ratio: 0.15
+    seed: 42
+    weight: 1.0
+
+  # Pillar 4 sub-config
+  irm_cf_config:
+    n_envs: 4
+    pos_threshold: 0.5
+    n_cf_pairs: 1000
+    irm_weight: 1.0
+    cf_weight: 1.0
+    seed: 42

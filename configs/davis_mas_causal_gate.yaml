@@ -1,0 +1,38 @@
+name: C2DTI_DAVIS_MAS_CAUSAL_GATE
+protocol: P1
+output:
+  base_dir: outputs
+dataset:
+  name: DAVIS
+  path: data/davis
+  allow_placeholder: true
+model:
+  # Main prediction model used for standard evaluation metrics.
+  name: interaction_cross_attention
+  latent_dim: 16
+  epochs: 5
+  lr: 0.01
+  seed: 42
+  attention_temperature: 1.0
+  top_k: 8
+split:
+  strategy: random
+  test_ratio: 0.2
+  seed: 42
+perturbation:
+  strength: 0.10
+  seed: 42
+causal:
+  enabled: true
+  mode: mas
+  weight: 1.0
+  # Pillar 3: Masked AutoEncoder Self-Supervision config.
+  # We load frozen embeddings for drugs (SMILES) and proteins (AA sequences),
+  # then measure how well 15% of masked dims can be reconstructed from the rest.
+  # If NPZ paths are null/missing, the pipeline uses deterministic hash features as fallback.
+  mas_config:
+    drug_npz_path: null        # set to real ChemBERTa NPZ when available
+    prot_npz_path: null        # set to real ANKH NPZ when available
+    embedding_dim: 768         # embedding dimension (default ChemBERTa/ANKH dim)
+    mask_ratio: 0.15           # fraction of dims to mask (15% as per paper)
+    seed: 42                   # for reproducible mask selection

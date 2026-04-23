@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 
+from src.c2dti.backbones import load_frozen_entity_embeddings
 from src.c2dti.data_utils import build_string_feature_matrix
 from src.c2dti.dataset_loader import DTIDataset
 
@@ -138,6 +139,112 @@ class SimpleMatrixDTIPredictor(DTIPredictor):
 
         predictions = (0.4 * row_means) + (0.4 * col_means) + (0.1 * global_mean) + (0.1 * feature_prior)
         return np.clip(predictions.astype(np.float32), 0.0, 1.0)
+
+
+class DualFrozenBackbonePredictor(DTIPredictor):
+    """Phase-1 sequence-view predictor with frozen drug/protein embeddings.
+
+    This implementation is intentionally lightweight and non-breaking:
+    - Loads frozen embeddings from NPZ files when available.
+    - Falls back to deterministic hash features when NPZ files are missing.
+    - Uses train-mask-only calibration so evaluation remains leakage-safe.
+    """
+
+    def __init__(
+        self,
+        chemberta_npz_path: Optional[str] = None,
+        ankh_npz_path: Optional[str] = None,
+        fusion_alpha: float = 0.7,
+        max_calibration_samples: int = 200000,
+        seed: int = 42,
+    ) -> None:
+        self.chemberta_npz_path = chemberta_npz_path
+        self.ankh_npz_path = ankh_npz_path
+        self.fusion_alpha = float(np.clip(fusion_alpha, 0.0, 1.0))
+        self.max_calibration_samples = int(max(1000, max_calibration_samples))
+        self.seed = int(seed)
+
+    def fit_predict(
+        self,
+        dataset: DTIDataset,
+        train_mask: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        y = dataset.interactions.astype(np.float64)
+        if y.size == 0:
+            return y.astype(np.float32)
+
+        if train_mask is not None:
+            known_mask = train_mask & ~np.isnan(y)
+        else:
+            known_mask = ~np.isnan(y)
+
+        # Frozen embeddings (or deterministic fallback) for both modalities.
+        drug_emb = load_frozen_entity_embeddings(
+            entities=dataset.drugs,
+            npz_path=self.chemberta_npz_path,
+            default_dim=768,
+        ).astype(np.float64)
+        target_emb = load_frozen_entity_embeddings(
+            entities=dataset.targets,
+            npz_path=self.ankh_npz_path,
+            default_dim=768,
+        ).astype(np.float64)
+
+        # Cosine-like interaction prior from normalized frozen embeddings.
+        dn = drug_emb / np.maximum(np.linalg.norm(drug_emb, axis=1, keepdims=True), 1e-12)
+        tn = target_emb / np.maximum(np.linalg.norm(target_emb, axis=1, keepdims=True), 1e-12)
+        sim = dn @ tn.T
+        sim = np.clip((sim + 1.0) * 0.5, 0.0, 1.0)
+
+        # Interaction statistics from training view only.
+        y_masked = np.where(known_mask, y, np.nan)
+        global_mean = float(np.nanmean(y_masked)) if int(known_mask.sum()) > 0 else 0.5
+        row_means = np.nanmean(y_masked, axis=1, keepdims=True)
+        col_means = np.nanmean(y_masked, axis=0, keepdims=True)
+        row_means = np.where(np.isnan(row_means), global_mean, row_means)
+        col_means = np.where(np.isnan(col_means), global_mean, col_means)
+        stats_prior = 0.5 * row_means + 0.5 * col_means
+
+        # Sequence-view fusion: frozen prior + statistical prior.
+        alpha = self.fusion_alpha
+        base_pred = (alpha * sim) + ((1.0 - alpha) * stats_prior)
+        base_pred = np.clip(base_pred, 0.0, 1.0)
+
+        # Calibrate on train entries only (linear head equivalent).
+        if int(known_mask.sum()) == 0:
+            return base_pred.astype(np.float32)
+
+        idx = np.flatnonzero(known_mask)
+        rng = np.random.RandomState(self.seed)
+        if idx.size > self.max_calibration_samples:
+            idx = rng.choice(idx, size=self.max_calibration_samples, replace=False)
+
+        y_flat = y.ravel()
+        base_flat = base_pred.ravel()
+        sim_flat = sim.ravel()
+        row_flat = np.repeat(row_means[:, 0], y.shape[1])
+        col_flat = np.tile(col_means[0, :], y.shape[0])
+
+        x = np.stack(
+            [
+                np.ones_like(base_flat[idx]),
+                base_flat[idx],
+                sim_flat[idx],
+                row_flat[idx],
+                col_flat[idx],
+            ],
+            axis=1,
+        )
+        beta, *_ = np.linalg.lstsq(x, y_flat[idx], rcond=None)
+
+        pred = (
+            beta[0]
+            + beta[1] * base_pred
+            + beta[2] * sim
+            + beta[3] * row_means
+            + beta[4] * col_means
+        )
+        return np.clip(pred, 0.0, 1.0).astype(np.float32)
 
 
 class MatrixFactorizationDTIPredictor(DTIPredictor):
@@ -433,6 +540,7 @@ def create_predictor(model_name_or_cfg: Union[str, Dict]) -> DTIPredictor:
 
     Supported model names:
       "simple_baseline"        -> SimpleMatrixDTIPredictor (fast, non-trainable)
+            "dual_frozen_backbone"   -> DualFrozenBackbonePredictor (Phase-1 frozen embedding model)
       "matrix_factorization"   -> MatrixFactorizationDTIPredictor (trainable)
             "mixhop_propagation"     -> MixHopPropagationDTIPredictor
             "interaction_cross_attention" -> InteractionCrossAttentionDTIPredictor
@@ -449,6 +557,15 @@ def create_predictor(model_name_or_cfg: Union[str, Dict]) -> DTIPredictor:
 
     if normalized_name == "simple_baseline":
         return SimpleMatrixDTIPredictor()
+
+    if normalized_name == "dual_frozen_backbone":
+        return DualFrozenBackbonePredictor(
+            chemberta_npz_path=model_cfg.get("chemberta_npz_path"),
+            ankh_npz_path=model_cfg.get("ankh_npz_path"),
+            fusion_alpha=float(model_cfg.get("fusion_alpha", 0.7)),
+            max_calibration_samples=int(model_cfg.get("max_calibration_samples", 200000)),
+            seed=int(model_cfg.get("seed", 42)),
+        )
 
     if normalized_name == "matrix_factorization":
         return MatrixFactorizationDTIPredictor(
@@ -476,5 +593,5 @@ def create_predictor(model_name_or_cfg: Union[str, Dict]) -> DTIPredictor:
 
     raise ValueError(
         f"Unsupported model.name: {model_name!r}. "
-        "Must be one of: simple_baseline, matrix_factorization, mixhop_propagation, interaction_cross_attention"
+        "Must be one of: simple_baseline, dual_frozen_backbone, matrix_factorization, mixhop_propagation, interaction_cross_attention"
     )
