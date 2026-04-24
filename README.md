@@ -2,19 +2,6 @@
 
 Cross-view Causal DTI (C2DTI) is a research repository for drug-target interaction prediction with multimodal causal consistency. The core idea is a cross-view causal agreement objective that enforces consistency between sequence and graph evidence under perturbation.
 
-## Status
-
-[![Tests](https://github.com/HussenYesufAlli/C2DTI/actions/workflows/tests.yml/badge.svg)](https://github.com/HussenYesufAlli/C2DTI/actions/workflows/tests.yml)
-[![Gate](https://github.com/HussenYesufAlli/C2DTI/actions/workflows/gate.yml/badge.svg)](https://github.com/HussenYesufAlli/C2DTI/actions/workflows/gate.yml)
-[![Branch](https://img.shields.io/badge/branch-dev-blue)](https://github.com/HussenYesufAlli/C2DTI/tree/dev)
-[![PR%20Policy](https://img.shields.io/badge/PR-feature%2F*%20to%20dev-informational)](https://github.com/HussenYesufAlli/C2DTI/blob/main/docs/REPO_WORKFLOW.md)
-
-## Repository Goals
-
-1. Reproduce the baseline pipeline under a fixed protocol.
-2. Implement controlled causal extensions without breaking legacy behavior.
-3. Track experiments and manuscript artifacts with reproducible git workflow.
-
 ## Project Structure
 
 - `src/`: implementation code
@@ -22,7 +9,7 @@ Cross-view Causal DTI (C2DTI) is a research repository for drug-target interacti
 - `scripts/`: execution helpers (to be added as implementation proceeds)
 - `docs/`: method and experiment documentation
 - `tests/`: test scaffolding
-- `data/`: local data placeholders only
+- `datasets/`: local data placeholders only
 - `outputs/`: runtime artifacts (ignored)
 - `models/`: checkpoints (ignored)
 
@@ -40,89 +27,47 @@ git pull origin dev
 git checkout -b feature/<task-name>
 ```
 
-Commit in small units, then open a PR from `feature/*` to `dev`.
-
-CI now enforces `make gate-all` and `make gate-summary` on push/PR via
-`.github/workflows/gate.yml`; treat a green gate check as required before merge.
-
-## Common Commands
-
-```bash
-make test
-make smoke
-python scripts/run.py --config configs/davis_real_pipeline_strict.yaml --check-data
-make check-data-all
-make scaffold-data-layout
-make fill-demo-data
-make run-once-all
-make real-all
-make validate-outputs
-make gate-summary
-make gate-bundle
-make gate-all
-```
-
-Use `--check-data` before a strict real run to verify required files and
+Use `--check-data` before a strict dataset run to verify required files and
 matrix shape without starting the prediction pipeline.
-
-Each dataset precheck also writes a reusable JSON report under
-`outputs/checks/<config_name>_data_check.json`.
-
-That report now includes dataset-specific schema details, such as expected
-BindingDB columns and DAVIS/KIBA required file names.
-
-For BindingDB, the precheck also validates the CSV header and records which
-required columns were found, resolved via aliases, or still missing.
-It also requires at least one non-empty data row in the CSV.
-
-For DAVIS/KIBA, the precheck now validates that:
-- line counts in `drug_smiles.txt` and `target_sequences.txt` are readable
-- `Y.txt` can be parsed
-- parsed `Y.txt` shape matches `[num_drugs, num_targets]`
-- non-empty drug/target entries are present (empty files are rejected)
-
-Use `make check-data-all` to run strict prechecks for DAVIS, BindingDB,
-and KIBA in one shot with a compact pass/fail summary.
-
-When checks fail, `make check-data-all` now prints a next-actions checklist
-derived from JSON reports (for example, exact missing file paths to create).
-
-Use `make scaffold-data-layout` to create the required `data/` file structure
-quickly before filling real dataset contents.
-
-Use `make fill-demo-data` to populate scaffolded files with minimal synthetic
-content that satisfies strict checks for quick pipeline validation.
-
-Use `make run-once-all` to execute all strict configs once and get a compact
-pass/fail summary for end-to-end run contracts.
-
-Use `make real-all` to run strict data prechecks first and then execute all
-strict run-once configs in one command.
-
-Use `make gate-all` as the full quality gate: unit tests, smoke checks, strict
-data prechecks, strict run-once execution, and output artifact validation in a
-single command.
-
-Use `make validate-outputs` to verify that latest run artifacts exist for each
-strict config (`summary.json`, `config_snapshot.yaml`, `predictions.csv`, and
-registry entries).
-
-Use `make gate-summary` to generate `outputs/gates/latest_gate_summary.md`
-from the latest gate and validation reports and fail if any status is non-pass.
-
-Use `make gate-bundle` to package latest gate evidence into
-`outputs/gates/bundles/gate_bundle_<timestamp>.tar.gz` for supervisor/PR sharing.
-
-`make gate-all` now writes a JSON evidence report under
-`outputs/gates/gate_all_<timestamp>.json` with step-level pass/fail status.
-
-For a supervisor walkthrough, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 For MixHop-to-C2DTI migration decisions, use
 [docs/MIXHOP_TO_C2DTI_MIGRATION_GATE.md](docs/MIXHOP_TO_C2DTI_MIGRATION_GATE.md).
 
 For C2DTI-side parity execution tracking, use
 [docs/C2DTI_GRAPH_PARITY_TRACKER_2026-04-22.md](docs/C2DTI_GRAPH_PARITY_TRACKER_2026-04-22.md).
+
+
+## Phase 6 Evaluation Matrix
+
+Run the full causal evaluation matrix (regression, 135 runs: 3 datasets × 3 splits × 5 ablations × 3 seeds):
+
+```bash
+# Pilot — validate 3 runs before committing to full matrix
+python scripts/run_eval_matrix.py --mode run-once --execute --max-runs 3
+
+# Full matrix
+python scripts/run_eval_matrix.py --mode run-once --execute
+```
+
+Run the binary classification evaluation matrix (27 runs: 3 datasets × 3 splits × 3 seeds):
+
+```bash
+# Pilot — validate 3 runs before committing to full matrix
+python scripts/run_binary_eval_matrix.py --mode run-once --execute --max-runs 3
+
+# Full matrix
+python scripts/run_binary_eval_matrix.py --mode run-once --execute
+```
+
+After all runs complete, compile results into CSV tables:
+
+```bash
+python scripts/compile_results.py --prefix C2DTI_EVAL_
+python scripts/compile_binary_results.py --prefix C2DTI_BINARY_EVAL_
+```
+
+Outputs land in `outputs/reports/` and `outputs_binary/reports/` respectively.
+
 
 ## Current Focus
 

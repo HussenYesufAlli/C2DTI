@@ -45,7 +45,7 @@ class TestConfigValidation(unittest.TestCase):
             "dataset": {"name": "UNKNOWN"},
         }
         errors = validate_config(cfg)
-        self.assertIn("dataset.name must be one of: BindingDB, DAVIS, KIBA", errors)
+        self.assertIn("dataset.name must be one of: BindingDB, BindingDB_Kd, DAVIS, KIBA", errors)
         self.assertIn("dataset.path is required when dataset config is provided", errors)
 
     def test_invalid_allow_placeholder_type_is_rejected(self) -> None:
@@ -61,6 +61,28 @@ class TestConfigValidation(unittest.TestCase):
         }
         errors = validate_config(cfg)
         self.assertIn("dataset.allow_placeholder must be a boolean", errors)
+
+    def test_model_objective_accepts_regression(self) -> None:
+        cfg = {
+            "name": "C2DTI_OBJECTIVE_OK",
+            "protocol": "P1",
+            "output": {"base_dir": "outputs"},
+            "model": {"name": "mixhop_propagation", "objective": "regression"},
+        }
+        self.assertEqual(validate_config(cfg), [])
+
+    def test_model_objective_invalid_value_is_rejected(self) -> None:
+        cfg = {
+            "name": "C2DTI_OBJECTIVE_BAD",
+            "protocol": "P1",
+            "output": {"base_dir": "outputs"},
+            "model": {"name": "interaction_cross_attention", "objective": "multiclass"},
+        }
+        errors = validate_config(cfg)
+        self.assertIn(
+            "model.objective must be one of: auto, binary_classification, regression",
+            errors,
+        )
 
 
 if __name__ == "__main__":

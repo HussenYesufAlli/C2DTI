@@ -1,0 +1,17 @@
+name: C2DTI_BINARY_EVAL_KIBA_COLD_TARGET_S34
+protocol: P_binary
+dataset:
+  name: KIBA
+  path: datasets/KIBA_binary.csv
+  allow_placeholder: false
+model:
+  name: simple_baseline
+  seed: 34
+split:
+  strategy: cold_target
+  test_ratio: 0.2
+  seed: 34
+binary:
+  threshold: 0.5
+output:
+  base_dir: outputs_binary

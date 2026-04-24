@@ -1,0 +1,23 @@
+name: davis_binary_emb
+protocol: P_binary
+
+dataset:
+  name: DAVIS
+  path: datasets/DAVIS_binary.csv
+  allow_placeholder: false
+
+model:
+  name: dual_frozen_backbone
+  drug_embedding_path: data/embeddings/DAVIS_drug_emb.npz
+  target_embedding_path: data/embeddings/DAVIS_target_emb.npz
+
+split:
+  strategy: random
+  test_ratio: 0.2
+  seed: 42
+
+binary:
+  threshold: 0.5
+
+output:
+  base_dir: outputs_binary

@@ -1,0 +1,17 @@
+name: C2DTI_BINARY_EVAL_BINDINGDB_COLD_DRUG_S42
+protocol: P_binary
+dataset:
+  name: BindingDB
+  path: datasets/BindingDB_Kd_binary.csv
+  allow_placeholder: false
+model:
+  name: simple_baseline
+  seed: 42
+split:
+  strategy: cold_drug
+  test_ratio: 0.2
+  seed: 42
+binary:
+  threshold: 0.5
+output:
+  base_dir: outputs_binary

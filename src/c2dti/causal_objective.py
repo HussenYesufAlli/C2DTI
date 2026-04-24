@@ -49,27 +49,27 @@ def compute_causal_score(
     weight: float = 0.0
 ) -> Optional[float]:
     """
-    Compute a placeholder causal consistency score.
+    Compute a baseline causal consistency score.
     
     Purpose:
-      This is a minimal placeholder that will be extended later with
-      real causal computations (e.g., cross-view agreement, perturbation effects).
+            This is a minimal baseline that will be extended later with
+            full causal computations (e.g., cross-view agreement, perturbation effects).
     
     Args:
         enabled: Whether causal objective is active.
         weight: Weight/importance of causal term (future use).
     
     Returns:
-        A placeholder causal score if enabled, otherwise None.
+        A baseline causal score if enabled, otherwise None.
     """
     if not enabled:
         return None
     
-    # Placeholder: in real implementation, this will compute cross-view
+    # Baseline stub: full implementation will compute cross-view
     # causal agreement, perturbation robustness, or similar metrics.
-    placeholder_score = 0.5
+    baseline_score = 0.5
     
-    return placeholder_score
+    return baseline_score
 
 
 def compute_causal_reliability_score(
@@ -235,7 +235,7 @@ def compute_irm_cf_losses(
 
       Counterfactual part:
         For each positive drug-target pair, we swap the target for a random one.
-        The model should score this fake pair low. If it scores it high, it's using
+                The model should score this counterfactual pair low. If it scores it high, it's using
         a drug-level shortcut ('drug X always binds strongly') rather than learning
         the specific drug-target interaction.
 

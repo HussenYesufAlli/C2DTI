@@ -31,8 +31,6 @@ def parse_identity(run_name: str) -> Dict[str, str]:
     C2DTI_EVAL_DAVIS_RANDOM_FULL_S10
     """
     parts = run_name.split("_")
-    # Expected format: C2DTI_EVAL_<DATASET>_<SPLIT>_<ABLATION>_S<SEED>
-    # Example: C2DTI_EVAL_DAVIS_RANDOM_FULL_S10
     if len(parts) < 6:
         return {
             "dataset": "UNKNOWN",
@@ -40,11 +38,33 @@ def parse_identity(run_name: str) -> Dict[str, str]:
             "ablation": "UNKNOWN",
             "seed": "UNKNOWN",
         }
+
+    # Supports both single-token and multi-token identities, for example:
+    #   C2DTI_EVAL_DAVIS_RANDOM_FULL_S10
+    #   C2DTI_EVAL_BINDINGDB_COLD_DRUG_NO_CF_S42
+    dataset = parts[2]
+    identity_parts = parts[3:-1]
+    if not identity_parts:
+        return {
+            "dataset": dataset,
+            "split": "UNKNOWN",
+            "ablation": "UNKNOWN",
+            "seed": parts[-1].lstrip("S"),
+        }
+
+    if len(identity_parts) >= 3 and identity_parts[0] == "COLD":
+        split = "_".join(identity_parts[:2])
+        ablation_parts = identity_parts[2:]
+    else:
+        split = identity_parts[0]
+        ablation_parts = identity_parts[1:]
+
+    ablation = "_".join(ablation_parts) if ablation_parts else "UNKNOWN"
     return {
-        "dataset": parts[2],
-        "split": parts[3],
-        "ablation": parts[4],
-        "seed": parts[5].lstrip("S"),
+        "dataset": dataset,
+        "split": split,
+        "ablation": ablation,
+        "seed": parts[-1].lstrip("S"),
     }
 
 
@@ -81,6 +101,22 @@ def safe_float(value: object) -> float:
         return float("nan")
 
 
+def dedupe_latest_rows(rows: List[Dict[str, object]]) -> List[Dict[str, object]]:
+    """Keep only the latest row for each logical run_name.
+
+    This protects aggregate reporting when a matrix run is interrupted and later
+    resumed, which can produce multiple run directories for the same run_name.
+    """
+    latest_by_name: Dict[str, Dict[str, object]] = {}
+    for row in rows:
+        run_name = str(row.get("run_name", ""))
+        summary_path = str(row.get("summary_path", ""))
+        prev = latest_by_name.get(run_name)
+        if prev is None or summary_path > str(prev.get("summary_path", "")):
+            latest_by_name[run_name] = row
+    return list(latest_by_name.values())
+
+
 def main() -> int:
     args = parse_args()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -102,6 +138,8 @@ def main() -> int:
             continue
 
         rows.append(flatten_row(payload, summary_path))
+
+    rows = dedupe_latest_rows(rows)
 
     if not rows:
         print(f"[INFO] No runs found with prefix={args.prefix}")

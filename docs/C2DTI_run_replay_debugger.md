@@ -1,6 +1,6 @@
 # C2DTI Run Replay (Debugger Style)
 
-This document replays two real completed runs as if we are stepping through a debugger.
+This document replays two completed dataset runs as if we are stepping through a debugger.
 
 Compared runs:
 
@@ -51,7 +51,7 @@ Observed output in both runs:
 
 1. `num_drugs = 68`
 2. `num_targets = 379`
-3. `dataset_placeholder = false` (real data, not fallback)
+3. `dataset_placeholder = false` (dataset files loaded, no fallback path)
 
 ## 4. Split Stage
 

@@ -59,7 +59,7 @@ def main() -> None:
         "--real-cmd",
         nargs="+",
         default=["make", "real-all"],
-        help="Command tokens for strict real pipeline step. Default: make real-all",
+        help="Command tokens for strict dataset-backed pipeline step. Default: make real-all",
     )
     parser.add_argument(
         "--report-path",
@@ -80,7 +80,7 @@ def main() -> None:
     print("[INFO] Running unified quality gate...")
     step_results: List[Dict[str, Any]] = []
 
-    # Step order intentionally enforces fast feedback before real pipeline checks.
+    # Step order intentionally enforces fast feedback before strict pipeline checks.
     step_results.append(_run_step("verify", args.verify_cmd))
     if step_results[-1]["return_code"] == 0:
         step_results.append(_run_step("real-all", args.real_cmd))

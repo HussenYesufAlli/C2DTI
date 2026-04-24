@@ -5,7 +5,7 @@ from src.c2dti.causal_objective import validate_causal_config
 
 
 def _validate_dataset_config(dataset_cfg: Any) -> List[str]:
-    """Validate optional dataset configuration for real pipeline runs."""
+    """Validate optional dataset configuration for dataset-backed pipeline runs."""
     if dataset_cfg is None:
         return []
 
@@ -16,8 +16,8 @@ def _validate_dataset_config(dataset_cfg: Any) -> List[str]:
     dataset_name = dataset_cfg.get("name")
     if not dataset_name:
         errors.append("dataset.name is required when dataset config is provided")
-    elif str(dataset_name).upper() not in {"BINDINGDB", "DAVIS", "KIBA"}:
-        errors.append("dataset.name must be one of: BindingDB, DAVIS, KIBA")
+    elif str(dataset_name).upper() not in {"BINDINGDB", "BINDINGDB_KD", "DAVIS", "KIBA"}:
+        errors.append("dataset.name must be one of: BindingDB, BindingDB_Kd, DAVIS, KIBA")
 
     if not dataset_cfg.get("path"):
         errors.append("dataset.path is required when dataset config is provided")
@@ -30,16 +30,19 @@ def _validate_dataset_config(dataset_cfg: Any) -> List[str]:
 
 
 def _validate_model_config(model_cfg: Any) -> List[str]:
-    """Validate optional model configuration used by the real pipeline path.
+    """Validate optional model configuration used by the dataset-backed pipeline path.
 
         Supported model names and their config keys:
             simple_baseline           : no additional keys required
             dual_frozen_backbone      : chemberta_npz_path (str, optional), ankh_npz_path (str, optional),
                                                                     fusion_alpha (float in [0, 1]), max_calibration_samples (int >= 1000), seed (int)
+            end_to_end_char_encoder   : embedding_dim (int), epochs (int), lr (float),
+                                                                    max_drug_len (int), max_target_len (int), l2 (float), seed (int)
             matrix_factorization      : latent_dim (int), epochs (int), lr (float), seed (int)
             mixhop_propagation        : top_k (int), hop_weights (list[float])
             interaction_cross_attention : latent_dim (int), epochs (int), lr (float),
                                                                         seed (int), attention_temperature (float), top_k (int)
+            shared objective selector : objective ("auto" | "binary_classification" | "regression")
     """
     if model_cfg is None:
         return []
@@ -54,6 +57,7 @@ def _validate_model_config(model_cfg: Any) -> List[str]:
     valid_names = {
         "simple_baseline",
         "dual_frozen_backbone",
+        "end_to_end_char_encoder",
         "matrix_factorization",
         "mixhop_propagation",
         "interaction_cross_attention",
@@ -100,6 +104,21 @@ def _validate_model_config(model_cfg: Any) -> List[str]:
         elif any((not isinstance(v, (int, float)) or float(v) < 0.0) for v in val):
             errors.append("model.hop_weights entries must be non-negative numbers")
 
+    if "objective" in model_cfg:
+        val = str(model_cfg["objective"]).strip().lower()
+        valid_objectives = {
+            "auto",
+            "binary",
+            "binary_classification",
+            "classification",
+            "regression",
+            "continuous",
+        }
+        if val not in valid_objectives:
+            errors.append(
+                "model.objective must be one of: auto, binary_classification, regression"
+            )
+
     if "chemberta_npz_path" in model_cfg:
         val = model_cfg["chemberta_npz_path"]
         if val is not None and not isinstance(val, str):
@@ -119,6 +138,26 @@ def _validate_model_config(model_cfg: Any) -> List[str]:
         val = model_cfg["max_calibration_samples"]
         if not isinstance(val, int) or val < 1000:
             errors.append("model.max_calibration_samples must be an integer >= 1000")
+
+    if "embedding_dim" in model_cfg:
+        val = model_cfg["embedding_dim"]
+        if not isinstance(val, int) or val < 8:
+            errors.append("model.embedding_dim must be an integer >= 8")
+
+    if "max_drug_len" in model_cfg:
+        val = model_cfg["max_drug_len"]
+        if not isinstance(val, int) or val < 8:
+            errors.append("model.max_drug_len must be an integer >= 8")
+
+    if "max_target_len" in model_cfg:
+        val = model_cfg["max_target_len"]
+        if not isinstance(val, int) or val < 8:
+            errors.append("model.max_target_len must be an integer >= 8")
+
+    if "l2" in model_cfg:
+        val = model_cfg["l2"]
+        if not isinstance(val, (int, float)) or float(val) < 0.0:
+            errors.append("model.l2 must be a non-negative number")
 
     return errors
 

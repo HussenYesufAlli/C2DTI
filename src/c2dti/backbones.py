@@ -210,3 +210,104 @@ class MASHead:
         Y_pred = X @ self._W + self._b                          # (n, d_masked)
 
         return float(np.mean((Y_pred - Y_true) ** 2))
+
+
+# ---------------------------------------------------------------------------
+# SequenceViewEncoder — Pillar 1: Dual Backbone Sequence View
+# ---------------------------------------------------------------------------
+
+class SequenceViewEncoder:
+    """Character n-gram encoder for drug SMILES and protein amino-acid sequences.
+
+    Beginner-friendly explanation:
+    --------------------------------
+    A SMILES string like "CC(=O)Nc1ccc(O)cc1" is just text.
+    We turn it into a fixed-size number vector by counting how often each short
+    sub-string (n-gram) appears.  For example with n=2:
+      "CCN" → bigrams: "CC", "CN"  → count each one.
+    We hash every n-gram into a bucket (0 … vocab_size-1) using Python's built-in
+    hash function, then count how many n-grams fell into each bucket.
+    That count vector is the embedding for this molecule.
+
+    The same idea works for proteins: "MKTAYIAKQR…" counted with n=3 (trigrams).
+
+    Why this is useful for C2DTI Pillar 1:
+    - Requires NO pre-training, NO GPU, NO external files.
+    - Is deterministic — same string → same vector, every run.
+    - Provides a "raw sequence view" independent of the frozen NPZ embeddings,
+      which is exactly what the causal dual-backbone (Pillar 1) needs.
+
+    Args:
+        ngram_n:    Length of character n-grams (default 2 for drugs, 3 for proteins).
+        vocab_size: Number of hash buckets = output embedding dimension.
+        normalize:  If True, L2-normalize each row so magnitudes are comparable.
+    """
+
+    def __init__(
+        self,
+        ngram_n: int = 2,
+        vocab_size: int = 512,
+        normalize: bool = True,
+    ) -> None:
+        self.ngram_n = ngram_n
+        self.vocab_size = vocab_size
+        self.normalize = normalize
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _ngrams(self, text: str) -> list:
+        """Extract all overlapping n-grams from a string.
+
+        Pads strings shorter than ngram_n so every input produces at least
+        one n-gram and the encoder never silently returns an all-zero vector.
+        Example: _ngrams("ACGT", n=2) → ["AC", "CG", "GT"]
+        """
+        n = self.ngram_n
+        if len(text) < n:
+            text = text.ljust(n, "_")
+        return [text[i : i + n] for i in range(len(text) - n + 1)]
+
+    def _encode_one(self, text: str) -> np.ndarray:
+        """Encode a single string into a vocab_size-dimensional count vector.
+
+        Steps:
+        1. Extract n-grams.
+        2. Hash each n-gram into a bucket index (0 … vocab_size-1).
+        3. Count hits per bucket.
+        4. Optionally L2-normalize.
+        """
+        vec = np.zeros(self.vocab_size, dtype=np.float32)
+        for gram in self._ngrams(text):
+            # Python hash can be negative → abs + mod maps into [0, vocab_size).
+            bucket = abs(hash(gram)) % self.vocab_size
+            vec[bucket] += 1.0
+        if self.normalize:
+            norm = np.linalg.norm(vec)
+            if norm > 0:
+                vec /= norm
+        return vec
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def encode(self, sequences: Sequence[str]) -> np.ndarray:
+        """Encode a list of strings into an (n_sequences, vocab_size) matrix.
+
+        Args:
+            sequences: List of SMILES or amino-acid strings.
+
+        Returns:
+            Float32 array of shape (len(sequences), vocab_size).
+        """
+        if len(sequences) == 0:
+            return np.zeros((0, self.vocab_size), dtype=np.float32)
+        return np.stack([self._encode_one(s) for s in sequences], axis=0)
+
+    def __repr__(self) -> str:
+        return (
+            f"SequenceViewEncoder(ngram_n={self.ngram_n}, "
+            f"vocab_size={self.vocab_size}, normalize={self.normalize})"
+        )

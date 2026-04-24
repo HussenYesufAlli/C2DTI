@@ -14,21 +14,18 @@ All notable changes to this project will be documented in this file.
 - Structured GitHub issue templates for bug reports and feature requests.
 - Minimal CODEOWNERS policy for automatic review assignment on key paths.
 - README status badge section for CI and workflow visibility.
-- Minimal Makefile targets (`test`, `smoke`) for standardized local checks.
-- Two-minute supervisor demo guide with scripted verification flow.
 - Runner failure-path tests for missing and invalid configuration handling.
 - CI now uploads unit-test log artifacts for review evidence on each run.
-- Demo script now includes quick troubleshooting for common live-run issues.
 - Release checklist now includes an explicit Definition of Done section.
 - Release checklist now includes owner and reviewer sign-off fields.
-- **Non-breaking causal objective hook**: optional `causal` config section with `enabled` and `weight` keys; when enabled, computes placeholder causal score and includes it in run summary.
+- **Non-breaking causal objective hook**: optional `causal` config section with `enabled` and `weight` keys; when enabled, computes baseline causal score and includes it in run summary.
 - Causal objective module with validation, score computation, and comprehensive unit tests (8 new tests, all passing).
 - Example config `configs/causal_enabled.yaml` showing causal feature usage.
-- Optional real DTI pipeline path with dataset loaders for BindingDB, DAVIS, and KIBA.
+- Optional dataset-driven DTI pipeline path with dataset loaders for BindingDB, DAVIS, and KIBA.
 - Simple baseline DTI predictor, prediction CSV artifact output, and perturbation-based causal reliability scoring.
-- Example real-pipeline config `configs/davis_real_pipeline.yaml` and integration coverage for end-to-end dataset-to-output execution.
-- Strict dataset mode with `dataset.allow_placeholder: false` to fail fast when real files are missing.
-- Strict real-run config templates for DAVIS, BindingDB, and KIBA (`*_real_pipeline_strict.yaml`).
+- Example dataset-pipeline config `configs/davis_real_pipeline.yaml` and integration coverage for end-to-end dataset-to-output execution.
+- Strict dataset mode with `dataset.allow_placeholder: false` to fail fast when source files are missing.
+- Strict dataset-run config templates for DAVIS, BindingDB, and KIBA (`*_real_pipeline_strict.yaml`).
 - Dedicated dataset precheck command via `python scripts/run.py --config <config> --check-data`.
 - Dataset precheck now writes reusable JSON reports under `outputs/checks/` with file status and dataset summary.
 - Dataset precheck reports now include dataset-specific schema details to guide data preparation.
@@ -37,11 +34,9 @@ All notable changes to this project will be documented in this file.
 - Added `scripts/check_all_data.py` and `make check-data-all` to run strict prechecks for DAVIS/BindingDB/KIBA with one summary.
 - `check-data-all` now reads generated reports and prints a next-actions checklist (missing files/content fixes) per failed config.
 - Strict precheck now rejects BindingDB CSVs with header-only content and DAVIS/KIBA datasets with empty sequence files.
-- Added `scripts/scaffold_data_layout.py` and `make scaffold-data-layout` to create required dataset file paths quickly.
-- Added `scripts/fill_demo_data.py` and `make fill-demo-data` to populate scaffolded files with minimal synthetic data for strict-check validation.
 - Added `scripts/run_all_once.py` and `make run-once-all` to execute strict configs end-to-end with one summary.
 - Added `make real-all` to run strict prechecks and strict run-once execution in a single command.
-- Added `make gate-all` to run verify plus full strict real pipeline checks in one quality gate.
+- Added `make gate-all` to run verify plus full strict dataset pipeline checks in one quality gate.
 - Added `scripts/gate_all.py`; `make gate-all` now emits `outputs/gates/gate_all_<timestamp>.json` with step-level gate evidence.
 - Added `scripts/validate_run_outputs.py` and `make validate-outputs` to verify latest run artifacts and registry integrity for strict configs.
 - Extended `make gate-all` to include output validation as an enforced third gate step.

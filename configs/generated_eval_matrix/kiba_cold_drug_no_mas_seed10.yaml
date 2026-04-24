@@ -1,0 +1,56 @@
+name: C2DTI_EVAL_KIBA_COLD_DRUG_NO_MAS_S10
+protocol: P1
+output:
+  base_dir: outputs
+dataset:
+  name: KIBA
+  path: datasets/KIBA.csv
+  allow_placeholder: false
+model:
+  name: interaction_cross_attention
+  latent_dim: 16
+  epochs: 5
+  lr: 0.01
+  seed: 10
+  attention_temperature: 1.0
+  top_k: 8
+split:
+  strategy: cold_drug
+  test_ratio: 0.2
+  seed: 10
+perturbation:
+  strength: 0.1
+  seed: 10
+causal:
+  enabled: true
+  mode: unified
+  weight: 1.0
+  lambda_xview: 1.0
+  lambda_mas: 0.0
+  lambda_irm: 1.0
+  lambda_cf: 1.0
+  sequence_model:
+    name: dual_frozen_backbone
+    fusion_alpha: 0.7
+    seed: 10
+  graph_model:
+    name: mixhop_propagation
+    top_k: 8
+    hop_weights:
+    - 0.6
+    - 0.3
+    - 0.1
+  mas_config:
+    drug_npz_path: null
+    prot_npz_path: null
+    embedding_dim: 768
+    mask_ratio: 0.15
+    seed: 10
+    weight: 1.0
+  irm_cf_config:
+    n_envs: 4
+    pos_threshold: 0.5
+    n_cf_pairs: 1000
+    irm_weight: 1.0
+    cf_weight: 1.0
+    seed: 10

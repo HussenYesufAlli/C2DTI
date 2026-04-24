@@ -46,7 +46,7 @@ print(dataset.metadata)             # {'source': 'DAVIS', 'n_drugs': 68, ...}
 1. **Column validation**: Check required columns exist
    ```python
    required = {"Drug_ID", "Drug", "Target_ID", "Target", "Y"}
-   # If missing → returns placeholder dataset
+    # If missing -> returns fallback scaffold dataset
    ```
 
 2. **Type coercion**: Ensure correct data types
@@ -120,7 +120,7 @@ splitter = RandomSplitter(test_size=0.2, random_state=42)
 train_mask, test_mask = splitter.split(dataset)
 
 # ~80% pairs for training, ~20% for testing
-# Fast but unrealistic—model sees similar drugs/targets in train and test
+# Fast but optimistic-model sees similar drugs/targets in train and test
 ```
 
 ### 4.2 Cold Drug Split
@@ -131,7 +131,7 @@ splitter = ColdDrugSplitter(test_size=0.2, random_state=42)
 train_mask, test_mask = splitter.split(dataset)
 
 # Entire drugs held out from training
-# Realistic: model predicts affinity for NEW drugs
+# Deployment-like: model predicts affinity for NEW drugs
 # Harder evaluation
 ```
 
@@ -143,7 +143,7 @@ splitter = ColdTargetSplitter(test_size=0.2, random_state=42)
 train_mask, test_mask = splitter.split(dataset)
 
 # Entire targets held out from training
-# Realistic: model predicts affinity for NEW proteins
+# Deployment-like: model predicts affinity for NEW proteins
 # Harder evaluation
 ```
 

@@ -10,7 +10,7 @@ import numpy as np
 def build_string_feature_matrix(items: List[str], vector_size: int = 16) -> np.ndarray:
     """Convert strings into simple normalized hashed feature vectors.
 
-    This keeps the first real pipeline lightweight while still giving the
+    This keeps the first dataset-backed pipeline lightweight while still giving the
     model a deterministic numeric representation for drugs and targets.
     """
     if not items:

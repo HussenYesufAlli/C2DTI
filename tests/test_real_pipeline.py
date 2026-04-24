@@ -24,11 +24,22 @@ class TestRealPipeline(unittest.TestCase):
             (data_dir / "drug_smiles.txt").write_text("C\nCC\n", encoding="utf-8")
             (data_dir / "target_sequences.txt").write_text("AAAA\nBBBB\nCCCC\n", encoding="utf-8")
             np.savetxt(data_dir / "Y.txt", np.array([[0.9, 0.2, 0.5], [0.4, 0.8, 0.1]], dtype=np.float32), fmt="%.4f")
+            # Keep an explicit CSV fixture because DAVISLoader reads davis.csv in this pipeline.
+            (data_dir / "davis.csv").write_text(
+                "Drug_ID,Drug,Target_ID,Target,Y\n"
+                "0,C,0,AAAA,0.9\n"
+                "0,C,1,BBBB,0.2\n"
+                "0,C,2,CCCC,0.5\n"
+                "1,CC,0,AAAA,0.4\n"
+                "1,CC,1,BBBB,0.8\n"
+                "1,CC,2,CCCC,0.1\n",
+                encoding="utf-8",
+            )
 
             output_base = tmp_path / "outputs"
-            config_path = tmp_path / "real.yaml"
+            config_path = tmp_path / "dataset.yaml"
             cfg = {
-                "name": "C2DTI_REAL_TEST",
+                "name": "C2DTI_DATASET_TEST",
                 "protocol": "P1",
                 "output": {"base_dir": str(output_base)},
                 "dataset": {"name": "DAVIS", "path": str(data_dir)},

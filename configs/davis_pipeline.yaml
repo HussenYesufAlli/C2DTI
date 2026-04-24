@@ -1,0 +1,16 @@
+name: C2DTI_DAVIS_PIPELINE
+protocol: P1
+output:
+  base_dir: outputs
+dataset:
+  name: DAVIS
+  path: datasets/DAVIS.csv
+  allow_placeholder: false
+model:
+  name: simple_baseline
+perturbation:
+  strength: 0.2
+  seed: 42
+causal:
+  enabled: true
+  weight: 1.0

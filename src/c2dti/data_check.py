@@ -1,4 +1,4 @@
-"""Dataset precheck helpers for real C2DTI runs."""
+"""Dataset precheck helpers for strict dataset-backed C2DTI runs."""
 
 from __future__ import annotations
 
@@ -9,22 +9,36 @@ from typing import Any, Dict, List, Optional
 import warnings
 
 import numpy as np
+import pandas as pd
 import yaml
 
 from src.c2dti.config_validation import validate_config
 from src.c2dti.dataset_loader import DTIDataset, load_dti_dataset
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _resolve_runtime_path(raw_path: str) -> Path:
+    """Resolve config paths relative to the C2DTI repository root."""
+    path = Path(raw_path)
+    if path.is_absolute():
+        return path
+    return (REPO_ROOT / path).resolve()
+
+
 def _required_dataset_files(dataset_name: str, dataset_path: Path) -> List[Path]:
-    """Return the file paths a dataset must provide for a real run.
+    """Return the file paths a dataset must provide for a strict run.
 
     This keeps the expected on-disk contract explicit so the precheck output
     can tell the user exactly which files must exist.
     """
     normalized_name = dataset_name.strip().upper()
-    if normalized_name == "BINDINGDB":
+    if normalized_name in {"BINDINGDB", "BINDINGDB_KD"}:
         return [dataset_path]
     if normalized_name in {"DAVIS", "KIBA"}:
+        if dataset_path.is_file() and dataset_path.suffix.lower() == ".csv":
+            return [dataset_path]
         return [
             dataset_path / "drug_smiles.txt",
             dataset_path / "target_sequences.txt",
@@ -36,7 +50,7 @@ def _required_dataset_files(dataset_name: str, dataset_path: Path) -> List[Path]
 def _dataset_schema_details(dataset_name: str, dataset_path: Path) -> Dict[str, Any]:
     """Describe the expected dataset structure for the JSON report."""
     normalized_name = dataset_name.strip().upper()
-    if normalized_name == "BINDINGDB":
+    if normalized_name in {"BINDINGDB", "BINDINGDB_KD"}:
         return {
             "dataset_type": "csv",
             "path_kind": "file",
@@ -53,6 +67,17 @@ def _dataset_schema_details(dataset_name: str, dataset_path: Path) -> Dict[str, 
         }
 
     if normalized_name in {"DAVIS", "KIBA"}:
+        if dataset_path.is_file() and dataset_path.suffix.lower() == ".csv":
+            return {
+                "dataset_type": "csv",
+                "path_kind": "file",
+                "expected_path": str(dataset_path),
+                "required_columns": ["Drug_ID", "Drug", "Target_ID", "Target", "Y"],
+                "notes": [
+                    f"{dataset_name} can also be provided as a flat CSV export.",
+                    "This matches the datasets/*.csv files used for regression experiments.",
+                ],
+            }
         return {
             "dataset_type": "directory",
             "path_kind": "directory",
@@ -99,7 +124,7 @@ def _resolve_report_path(cfg: Dict[str, Any], config_path: Path) -> Path:
     We keep the filename deterministic so each config has one reusable report
     that gets refreshed every time the user runs the precheck.
     """
-    base_dir = Path(cfg.get("output", {}).get("base_dir", "outputs"))
+    base_dir = _resolve_runtime_path(str(cfg.get("output", {}).get("base_dir", "outputs")))
     report_dir = base_dir / "checks"
     report_dir.mkdir(parents=True, exist_ok=True)
     return report_dir / f"{config_path.stem}_data_check.json"
@@ -127,7 +152,7 @@ def _validate_bindingdb_content(dataset_path: Path) -> Dict[str, Any]:
     """Validate the BindingDB CSV header before the loader runs.
 
     This gives the user a precise report about column readiness instead of a
-    generic placeholder fallback when the file exists but is malformed.
+    generic fallback path when the file exists but is malformed.
     """
     validation: Dict[str, Any] = {
         "status": "skipped",
@@ -201,7 +226,7 @@ def _validate_bindingdb_content(dataset_path: Path) -> Dict[str, Any]:
 def _validate_dataset_content(dataset_name: str, dataset_path: Path) -> Dict[str, Any]:
     """Run dataset-specific content checks after file existence passes."""
     normalized_name = dataset_name.strip().upper()
-    if normalized_name == "BINDINGDB":
+    if normalized_name in {"BINDINGDB", "BINDINGDB_KD"}:
         return _validate_bindingdb_content(dataset_path)
 
     if normalized_name in {"DAVIS", "KIBA"}:
@@ -239,6 +264,38 @@ def _matrix_shape(raw_matrix: np.ndarray, n_drugs: int, n_targets: int) -> List[
 
 def _validate_sequence_matrix_content(dataset_name: str, dataset_path: Path) -> Dict[str, Any]:
     """Validate DAVIS/KIBA content: line counts and Y matrix shape consistency."""
+    if dataset_path.is_file() and dataset_path.suffix.lower() == ".csv":
+        validation: Dict[str, Any] = {
+            "status": "error",
+            "dataset": dataset_name,
+            "num_drugs_from_file": 0,
+            "num_targets_from_file": 0,
+            "y_matrix_shape": [0, 0],
+            "reason": "CSV validation not completed",
+        }
+
+        try:
+            df = pd.read_csv(dataset_path)
+        except Exception as exc:
+            validation["reason"] = f"Failed to parse flat CSV dataset: {exc}"
+            return validation
+
+        required = {"Drug_ID", "Drug", "Target_ID", "Target", "Y"}
+        missing = sorted(required.difference(set(df.columns)))
+        if missing:
+            validation["reason"] = f"CSV is missing required columns: {missing}"
+            return validation
+
+        validation["num_drugs_from_file"] = int(df["Drug_ID"].nunique())
+        validation["num_targets_from_file"] = int(df["Target_ID"].nunique())
+        validation["y_matrix_shape"] = [
+            validation["num_drugs_from_file"],
+            validation["num_targets_from_file"],
+        ]
+        validation["status"] = "ok"
+        validation["reason"] = "Flat CSV export contains the required DAVIS/KIBA columns"
+        return validation
+
     drug_file = dataset_path / "drug_smiles.txt"
     target_file = dataset_path / "target_sequences.txt"
     y_file = dataset_path / "Y.txt"
@@ -293,13 +350,13 @@ def _emit_report(report_path: Optional[Path], payload: Dict[str, Any]) -> None:
 
 
 def check_data(config_path: str) -> int:
-    """Validate dataset availability and shape before a real run starts.
+    """Validate dataset availability and shape before a strict run starts.
 
     Exit codes:
     - 0: dataset files are valid and loadable
     - 1: config path is missing
     - 2: config is invalid or does not define a dataset section
-    - 3: dataset files are missing or invalid for a strict real run
+    - 3: dataset files are missing or invalid for a strict dataset-backed run
     """
     cfg_path = Path(config_path)
     if not cfg_path.exists():
@@ -333,7 +390,7 @@ def check_data(config_path: str) -> int:
         return 2
 
     dataset_name = dataset_cfg["name"]
-    dataset_path = Path(dataset_cfg["path"])
+    dataset_path = _resolve_runtime_path(str(dataset_cfg["path"]))
     required_files = _required_dataset_files(dataset_name, dataset_path)
     missing_files = [path for path in required_files if not path.exists()]
     file_report = _build_required_file_report(required_files)
@@ -346,7 +403,7 @@ def check_data(config_path: str) -> int:
         print(f"[INFO] required_file[{status}]={required_file}")
 
     if missing_files:
-        print("[ERROR] Dataset files are missing for a real run:")
+        print("[ERROR] Dataset files are missing for a strict dataset-backed run:")
         for missing_file in missing_files:
             print(f"- {missing_file}")
         _emit_report(
@@ -360,7 +417,7 @@ def check_data(config_path: str) -> int:
                 "dataset_schema": schema_details,
                 "required_files": file_report,
                 "missing_files": [str(path) for path in missing_files],
-                "reason": "Dataset files are missing for a real run",
+                "reason": "Dataset files are missing for a strict dataset-backed run",
             },
         )
         return 3
@@ -389,8 +446,8 @@ def check_data(config_path: str) -> int:
     dataset_summary = summarize_dataset(dataset)
 
     if bool(dataset_summary["is_placeholder"]):
-        print("[ERROR] Dataset loader fell back to placeholder data")
-        print("[ERROR] Real dataset files may exist but are invalid in format or shape")
+        print("[ERROR] Dataset loader fell back to synthetic scaffold data")
+        print("[ERROR] Source dataset files may exist but are invalid in format or shape")
         _emit_report(
             report_path,
             {
@@ -403,7 +460,7 @@ def check_data(config_path: str) -> int:
                 "required_files": file_report,
                 "content_validation": content_validation,
                 "dataset_summary": dataset_summary,
-                "reason": "Dataset loader fell back to placeholder data",
+                "reason": "Dataset loader fell back to synthetic scaffold data",
             },
         )
         return 3

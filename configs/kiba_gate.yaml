@@ -4,7 +4,7 @@ output:
   base_dir: outputs
 dataset:
   name: KIBA
-  path: data/kiba
+  path: datasets/KIBA.csv
   allow_placeholder: true
 model:
   name: matrix_factorization

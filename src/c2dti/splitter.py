@@ -5,7 +5,7 @@ Why splitting matters (beginner explanation):
 When we evaluate a model, we want to know how well it performs on pairs it
 has NEVER seen during training.  If we evaluate on the same data we trained
 on, the model can simply memorise the answers — which gives artificially
-high metrics that won't hold in the real world.
+high metrics that may not hold under deployment conditions.
 
 A split divides all known drug-target pairs into two non-overlapping groups:
   - train set  : pairs the model is allowed to learn from
@@ -17,11 +17,11 @@ Three split strategies are provided, matching those used in the DTI literature:
                Simple and fast; used when no drug/target structure is assumed.
 
   cold_drug  : test set contains drugs that never appear in training.
-               Simulates the real-world scenario of predicting for a NEW drug.
+               Simulates deployment where the model predicts for a NEW drug.
                This is harder than random split (harder generalisation).
 
   cold_target: test set contains targets that never appear in training.
-               Simulates predicting for a NEW protein/target.
+               Simulates deployment prediction for a NEW protein/target.
 
 MINDG, DeepDTA, and GraphDTA all report results under these three protocols,
 so implementing them lets us produce directly comparable numbers.

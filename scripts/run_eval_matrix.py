@@ -17,9 +17,9 @@ BASE_CFG = ROOT / "configs" / "davis_unified_causal_gate.yaml"
 GEN_DIR = ROOT / "configs" / "generated_eval_matrix"
 
 DATASETS: List[Tuple[str, str]] = [
-    ("DAVIS", "data/davis"),
-    ("KIBA", "data/kiba"),
-    ("BindingDB", "data/bindingdb/bindingdb.csv"),
+    ("DAVIS", "datasets/DAVIS.csv"),
+    ("KIBA", "datasets/KIBA.csv"),
+    ("BindingDB", "datasets/BindingDB_Kd.csv"),
 ]
 SPLITS = ["random", "cold_drug", "cold_target"]
 ABLATIONS = ["full", "no_causal", "no_irm", "no_cf", "no_mas"]
@@ -104,7 +104,7 @@ def make_config(base_cfg: Dict, dataset: str, dataset_path: str, split: str, abl
     cfg.setdefault("dataset", {})
     cfg["dataset"]["name"] = dataset
     cfg["dataset"]["path"] = dataset_path
-    cfg["dataset"]["allow_placeholder"] = True
+    cfg["dataset"]["allow_placeholder"] = False
 
     cfg.setdefault("split", {})
     cfg["split"]["strategy"] = split

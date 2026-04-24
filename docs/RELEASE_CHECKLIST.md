@@ -13,14 +13,14 @@ A release is approved only when all Go/No-Go items are `Go`.
 
 - [ ] Go/No-Go: Unit tests pass locally.
 - [ ] Go/No-Go: CI workflow is green for latest `dev` commit.
-- [ ] Go/No-Go: Minimal run contract still succeeds.
+- [ ] Go/No-Go: Strict dataset precheck and one strict run contract succeed.
 
 Reference commands:
 
 ```bash
 python -m unittest discover -s tests -p 'test_*.py'
-python scripts/run.py --config configs/minimal.yaml --dry-run
-python scripts/run.py --config configs/minimal.yaml --run-once
+python scripts/run.py --config configs/davis_real_pipeline_strict.yaml --check-data
+python scripts/run.py --config configs/davis_real_pipeline_strict.yaml --run-once
 ```
 
 ## 3. Artifact Gate

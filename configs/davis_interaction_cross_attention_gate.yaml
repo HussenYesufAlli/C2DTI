@@ -4,7 +4,7 @@ output:
   base_dir: outputs
 dataset:
   name: DAVIS
-  path: data/davis
+  path: datasets/DAVIS.csv
   allow_placeholder: true
 model:
   name: interaction_cross_attention

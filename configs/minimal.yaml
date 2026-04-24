@@ -1,4 +1,0 @@
-name: C2DTI_MINIMAL
-protocol: P0
-output:
-  base_dir: outputs

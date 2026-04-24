@@ -48,3 +48,11 @@ htmlcov/
 !outputs/.gitkeep
 !models/.gitkeep
 !data/.gitkeep
+# Large raw matrix (excluded from git push)
+data-source/kiba/full_matrix_kiba.csv
+
+# Raw source dumps
+data-source/
+
+# Large run artifacts
+outputs_binary/runs/

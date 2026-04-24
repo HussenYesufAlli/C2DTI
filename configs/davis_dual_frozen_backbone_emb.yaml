@@ -1,0 +1,24 @@
+name: C2DTI_DAVIS_DUAL_FROZEN_BACKBONE_EMB
+protocol: P1
+output:
+  base_dir: outputs
+
+dataset:
+  name: DAVIS
+  path: datasets/DAVIS.csv
+  allow_placeholder: true
+
+model:
+  name: dual_frozen_backbone
+  fusion_alpha: 0.7
+  seed: 42
+  max_calibration_samples: 200000
+
+  # Real pretrained embeddings extracted from C2DTI DAVIS entities.
+  chemberta_npz_path: data/embeddings/DAVIS_chemberta_drug.npz
+  ankh_npz_path: data/embeddings/DAVIS_ankh_target.npz
+
+split:
+  strategy: random
+  test_ratio: 0.2
+  seed: 42

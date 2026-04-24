@@ -1,0 +1,17 @@
+name: C2DTI_BINARY_EVAL_DAVIS_COLD_DRUG_S34
+protocol: P_binary
+dataset:
+  name: DAVIS
+  path: datasets/DAVIS_binary.csv
+  allow_placeholder: false
+model:
+  name: simple_baseline
+  seed: 34
+split:
+  strategy: cold_drug
+  test_ratio: 0.2
+  seed: 34
+binary:
+  threshold: 0.5
+output:
+  base_dir: outputs_binary

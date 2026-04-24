@@ -29,6 +29,12 @@ def _row_softmax(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
     return ex / denom
 
 
+def _sigmoid(x: np.ndarray) -> np.ndarray:
+    """Numerically stable sigmoid used by binary end-to-end predictors."""
+    x = np.clip(x, -50.0, 50.0)
+    return 1.0 / (1.0 + np.exp(-x))
+
+
 def _row_normalize(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
     """Convert matrix rows to probability mass, preserving zeros."""
     denom = np.sum(x, axis=1, keepdims=True)
@@ -78,6 +84,56 @@ def _prepare_training_view(y: np.ndarray, train_mask: Optional[np.ndarray]) -> t
     return y_train, known_mask
 
 
+def _normalize_objective_name(objective: Optional[str]) -> str:
+    """Normalize objective aliases into canonical names.
+
+    Canonical names used in this module:
+      - "auto"
+      - "binary_classification"
+      - "regression"
+    """
+    if objective is None:
+        return "auto"
+
+    name = str(objective).strip().lower()
+    aliases = {
+        "auto": "auto",
+        "binary": "binary_classification",
+        "binary_classification": "binary_classification",
+        "classification": "binary_classification",
+        "regression": "regression",
+        "continuous": "regression",
+    }
+    if name not in aliases:
+        raise ValueError(
+            f"Unsupported objective: {objective!r}. "
+            "Must be one of: auto, binary_classification, regression"
+        )
+    return aliases[name]
+
+
+def _infer_objective_from_labels(y: np.ndarray, known_mask: np.ndarray) -> str:
+    """Infer objective from observed labels.
+
+    If all observed labels are in {0, 1}, treat as binary classification,
+    otherwise treat as regression.
+    """
+    observed = np.asarray(y, dtype=np.float64)[known_mask]
+    observed = observed[np.isfinite(observed)]
+    if observed.size == 0:
+        return "regression"
+
+    is_binary = np.all(np.isclose(observed, 0.0) | np.isclose(observed, 1.0))
+    return "binary_classification" if bool(is_binary) else "regression"
+
+
+def _resolve_objective(configured_objective: str, y: np.ndarray, known_mask: np.ndarray) -> str:
+    """Resolve objective from config and data labels."""
+    if configured_objective == "auto":
+        return _infer_objective_from_labels(y, known_mask)
+    return configured_objective
+
+
 class DTIPredictor(ABC):
     """Abstract interface for DTI predictors used by the runner."""
 
@@ -123,10 +179,31 @@ class SimpleMatrixDTIPredictor(DTIPredictor):
         if train_mask is not None:
             interactions = np.where(train_mask, interactions, np.nan)
 
-        # nanmean ignores masked-out (NaN) entries when computing averages
-        row_means = np.nanmean(interactions, axis=1, keepdims=True)
-        col_means = np.nanmean(interactions, axis=0, keepdims=True)
-        global_mean = float(np.nanmean(interactions))
+        # Robust mean computation for cold splits where entire rows/cols may be masked.
+        observed = ~np.isnan(interactions)
+        observed_count = int(np.sum(observed))
+        global_mean = float(np.nanmean(interactions)) if observed_count > 0 else 0.5
+
+        row_sum = np.nansum(interactions, axis=1, keepdims=True)
+        row_count = np.sum(observed, axis=1, keepdims=True)
+        row_means = np.divide(
+            row_sum,
+            row_count,
+            out=np.full_like(row_sum, np.nan),
+            where=row_count > 0,
+        )
+
+        col_sum = np.nansum(interactions, axis=0, keepdims=True)
+        col_count = np.sum(observed, axis=0, keepdims=True)
+        col_means = np.divide(
+            col_sum,
+            col_count,
+            out=np.full_like(col_sum, np.nan),
+            where=col_count > 0,
+        )
+
+        row_means = np.where(np.isnan(row_means), global_mean, row_means)
+        col_means = np.where(np.isnan(col_means), global_mean, col_means)
 
         drug_features = build_string_feature_matrix(dataset.drugs)
         target_features = build_string_feature_matrix(dataset.targets)
@@ -164,6 +241,47 @@ class DualFrozenBackbonePredictor(DTIPredictor):
         self.max_calibration_samples = int(max(1000, max_calibration_samples))
         self.seed = int(seed)
 
+    def _align_embedding_dims(
+        self,
+        drug_emb: np.ndarray,
+        target_emb: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Align drug/target embedding dimensions to a shared latent space.
+
+        Why this is needed:
+                - Pretrained tables can have different widths (for example,
+          ChemBERTa=384 and ANKH=768).
+        - The sequence-view prior uses a cosine-like dot product, which requires
+          the same feature dimension on both sides.
+
+        Strategy:
+        - If widths already match, return unchanged.
+        - Otherwise, apply deterministic random projection to both modalities into
+          a shared dimension (the smaller original width). This keeps behavior
+          stable and avoids hard failures while preserving as much information as
+          possible in a non-breaking way.
+        """
+        d_drug = int(drug_emb.shape[1])
+        d_target = int(target_emb.shape[1])
+        if d_drug == d_target:
+            return drug_emb, target_emb
+
+        shared_dim = min(d_drug, d_target)
+        rng = np.random.RandomState(self.seed)
+
+        # Scale by sqrt(input_dim) to keep projected magnitudes numerically stable.
+        proj_drug = rng.normal(0.0, 1.0, size=(d_drug, shared_dim)).astype(np.float64) / np.sqrt(max(d_drug, 1))
+        proj_target = rng.normal(0.0, 1.0, size=(d_target, shared_dim)).astype(np.float64) / np.sqrt(max(d_target, 1))
+
+        print(
+            "[DualFrozenBackbone] Embedding dimension mismatch detected "
+            f"(drug={d_drug}, target={d_target}). Projecting both to shared_dim={shared_dim}."
+        )
+
+        drug_aligned = drug_emb @ proj_drug
+        target_aligned = target_emb @ proj_target
+        return drug_aligned, target_aligned
+
     def fit_predict(
         self,
         dataset: DTIDataset,
@@ -190,6 +308,8 @@ class DualFrozenBackbonePredictor(DTIPredictor):
             default_dim=768,
         ).astype(np.float64)
 
+        drug_emb, target_emb = self._align_embedding_dims(drug_emb, target_emb)
+
         # Cosine-like interaction prior from normalized frozen embeddings.
         dn = drug_emb / np.maximum(np.linalg.norm(drug_emb, axis=1, keepdims=True), 1e-12)
         tn = target_emb / np.maximum(np.linalg.norm(target_emb, axis=1, keepdims=True), 1e-12)
@@ -199,8 +319,25 @@ class DualFrozenBackbonePredictor(DTIPredictor):
         # Interaction statistics from training view only.
         y_masked = np.where(known_mask, y, np.nan)
         global_mean = float(np.nanmean(y_masked)) if int(known_mask.sum()) > 0 else 0.5
-        row_means = np.nanmean(y_masked, axis=1, keepdims=True)
-        col_means = np.nanmean(y_masked, axis=0, keepdims=True)
+        # Compute row/column means with explicit counts to avoid RuntimeWarning
+        # when a cold-split row/column has no observed training labels.
+        row_sum = np.nansum(y_masked, axis=1, keepdims=True)
+        row_count = np.sum(~np.isnan(y_masked), axis=1, keepdims=True)
+        row_means = np.divide(
+            row_sum,
+            row_count,
+            out=np.full_like(row_sum, np.nan),
+            where=row_count > 0,
+        )
+
+        col_sum = np.nansum(y_masked, axis=0, keepdims=True)
+        col_count = np.sum(~np.isnan(y_masked), axis=0, keepdims=True)
+        col_means = np.divide(
+            col_sum,
+            col_count,
+            out=np.full_like(col_sum, np.nan),
+            where=col_count > 0,
+        )
         row_means = np.where(np.isnan(row_means), global_mean, row_means)
         col_means = np.where(np.isnan(col_means), global_mean, col_means)
         stats_prior = 0.5 * row_means + 0.5 * col_means
@@ -324,7 +461,7 @@ class MatrixFactorizationDTIPredictor(DTIPredictor):
         #   - If train_mask is provided (split was performed), train only on those entries.
         #   - Otherwise, train on all non-NaN entries (old behaviour, fully backward-compatible).
         if train_mask is not None:
-            # Combine: entry must be in train_mask AND have a real value
+            # Combine: entry must be in train_mask AND have an observed value
             known_mask = train_mask & ~np.isnan(Y)
         else:
             known_mask = ~np.isnan(Y)
@@ -367,7 +504,7 @@ class MatrixFactorizationDTIPredictor(DTIPredictor):
         # Final raw predictions
         raw = P @ Q.T  # (n_drugs, n_targets)
 
-        # Sigmoid maps any real number to (0, 1), matching affinity/probability scale
+        # Sigmoid maps any scalar score to (0, 1), matching affinity/probability scale
         predictions = 1.0 / (1.0 + np.exp(-np.clip(raw, -500, 500)))
         return predictions.astype(np.float32)
 
@@ -405,9 +542,11 @@ class MixHopPropagationDTIPredictor(DTIPredictor):
         self,
         top_k: int = 8,
         hop_weights: Optional[List[float]] = None,
+        objective: str = "auto",
     ) -> None:
         self.top_k = int(max(1, top_k))
         self.hop_weights = hop_weights if hop_weights is not None else [0.6, 0.3, 0.1]
+        self.objective = _normalize_objective_name(objective)
 
     def fit_predict(
         self,
@@ -418,7 +557,7 @@ class MixHopPropagationDTIPredictor(DTIPredictor):
         if y.size == 0:
             return y.astype(np.float32)
 
-        y_train, _ = _prepare_training_view(y, train_mask)
+        y_train, known_mask = _prepare_training_view(y, train_mask)
 
         drug_features = build_string_feature_matrix(dataset.drugs)
         target_features = build_string_feature_matrix(dataset.targets)
@@ -441,7 +580,10 @@ class MixHopPropagationDTIPredictor(DTIPredictor):
             drug_power = drug_power @ drug_adj
             target_power = target_power @ target_adj
 
-        return np.clip(pred, 0.0, 1.0).astype(np.float32)
+        objective = _resolve_objective(self.objective, y, known_mask)
+        if objective == "binary_classification":
+            pred = np.clip(pred, 0.0, 1.0)
+        return pred.astype(np.float32)
 
 
 class InteractionCrossAttentionDTIPredictor(DTIPredictor):
@@ -460,6 +602,7 @@ class InteractionCrossAttentionDTIPredictor(DTIPredictor):
         seed: int = 42,
         attention_temperature: float = 1.0,
         top_k: int = 8,
+        objective: str = "auto",
     ) -> None:
         self.latent_dim = int(max(1, latent_dim))
         self.epochs = int(max(1, epochs))
@@ -467,6 +610,7 @@ class InteractionCrossAttentionDTIPredictor(DTIPredictor):
         self.seed = int(seed)
         self.attention_temperature = float(max(1e-6, attention_temperature))
         self.top_k = int(max(1, top_k))
+        self.objective = _normalize_objective_name(objective)
 
     def fit_predict(
         self,
@@ -517,8 +661,11 @@ class InteractionCrossAttentionDTIPredictor(DTIPredictor):
             attn = _row_normalize(sparse_attn)
 
         # Calibrate branch fusion on training entries only.
+        objective = _resolve_objective(self.objective, y, known_mask)
         if int(known_mask.sum()) == 0:
-            return np.clip(mf_score, 0.0, 1.0).astype(np.float32)
+            if objective == "binary_classification":
+                return np.clip(mf_score, 0.0, 1.0).astype(np.float32)
+            return mf_score.astype(np.float32)
 
         x1 = mf_score[known_mask]
         x2 = attn[known_mask]
@@ -528,7 +675,194 @@ class InteractionCrossAttentionDTIPredictor(DTIPredictor):
         beta, *_ = np.linalg.lstsq(x, y_obs, rcond=None)
 
         pred = beta[0] + beta[1] * mf_score + beta[2] * attn
-        return np.clip(pred, 0.0, 1.0).astype(np.float32)
+        if objective == "binary_classification":
+            pred = np.clip(pred, 0.0, 1.0)
+        return pred.astype(np.float32)
+
+
+class EndToEndCharEncoderPredictor(DTIPredictor):
+    """True end-to-end predictor trained directly from raw strings.
+
+    Beginner-friendly summary:
+    - Input is raw text for each entity: drug SMILES and protein sequence.
+    - We learn trainable character embeddings for drugs and targets.
+    - Each entity vector is the mean of its character embeddings.
+    - Interaction score is a learned compatibility between the two vectors.
+    - All parameters are optimized jointly from the DTI objective.
+
+    This is intentionally independent from frozen NPZ embeddings so users can
+    run a full end-to-end training path without breaking existing predictors.
+    """
+
+    def __init__(
+        self,
+        embedding_dim: int = 64,
+        epochs: int = 30,
+        lr: float = 0.05,
+        max_drug_len: int = 160,
+        max_target_len: int = 2048,
+        l2: float = 1e-5,
+        seed: int = 42,
+    ) -> None:
+        self.embedding_dim = int(max(8, embedding_dim))
+        self.epochs = int(max(1, epochs))
+        self.lr = float(max(1e-6, lr))
+        self.max_drug_len = int(max(8, max_drug_len))
+        self.max_target_len = int(max(8, max_target_len))
+        self.l2 = float(max(0.0, l2))
+        self.seed = int(seed)
+        self.train_loss_history: list[float] = []
+
+    def _build_vocab(self, texts: List[str]) -> Dict[str, int]:
+        """Build char vocabulary with 0 as PAD token id."""
+        chars = sorted({ch for text in texts for ch in str(text)})
+        vocab = {ch: i + 1 for i, ch in enumerate(chars)}
+        return vocab
+
+    def _encode_texts(self, texts: List[str], vocab: Dict[str, int], max_len: int) -> np.ndarray:
+        """Encode strings into padded char-id arrays of shape (n_entities, max_len)."""
+        out = np.zeros((len(texts), max_len), dtype=np.int64)
+        for i, text in enumerate(texts):
+            ids = [vocab.get(ch, 0) for ch in str(text)[:max_len]]
+            if ids:
+                out[i, : len(ids)] = ids
+        return out
+
+    def _mean_embed(self, token_ids: np.ndarray, embedding_table: np.ndarray) -> np.ndarray:
+        """Pool char embeddings by mean over non-pad characters."""
+        emb = embedding_table[token_ids]  # (n, L, d)
+        mask = (token_ids != 0).astype(np.float64)[..., None]
+        counts = np.maximum(mask.sum(axis=1), 1.0)
+        pooled = (emb * mask).sum(axis=1) / counts
+        return pooled
+
+    def _accumulate_char_grads(
+        self,
+        token_ids: np.ndarray,
+        d_entity: np.ndarray,
+        vocab_size: int,
+    ) -> np.ndarray:
+        """Backprop mean-pooling gradients into per-character embedding table."""
+        grad_table = np.zeros((vocab_size, d_entity.shape[1]), dtype=np.float64)
+        for i in range(token_ids.shape[0]):
+            ids = token_ids[i]
+            nz = ids[ids != 0]
+            if nz.size == 0:
+                continue
+            g = d_entity[i] / float(nz.size)
+            for idx in nz:
+                grad_table[idx] += g
+        return grad_table
+
+    def fit_predict(
+        self,
+        dataset: DTIDataset,
+        train_mask: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        """Fit end-to-end parameters and return dense prediction matrix."""
+        y = dataset.interactions.astype(np.float64)
+        if y.size == 0:
+            return y.astype(np.float32)
+
+        if train_mask is not None:
+            known_mask = train_mask & ~np.isnan(y)
+        else:
+            known_mask = ~np.isnan(y)
+
+        if int(known_mask.sum()) == 0:
+            return np.zeros_like(y, dtype=np.float32)
+
+        # Detect binary vs regression target space from training labels.
+        y_obs = y[known_mask]
+        unique_vals = np.unique(y_obs)
+        is_binary = set(unique_vals.tolist()).issubset({0.0, 1.0})
+
+        # For regression, optimize in standardized space then invert at the end.
+        if is_binary:
+            y_train = y.copy()
+            y_scale = 1.0
+            y_shift = 0.0
+        else:
+            y_shift = float(np.mean(y_obs))
+            y_scale = float(np.std(y_obs) + 1e-8)
+            y_train = (y - y_shift) / y_scale
+
+        rng = np.random.RandomState(self.seed)
+
+        drug_vocab = self._build_vocab(dataset.drugs)
+        target_vocab = self._build_vocab(dataset.targets)
+
+        drug_tokens = self._encode_texts(dataset.drugs, drug_vocab, self.max_drug_len)
+        target_tokens = self._encode_texts(dataset.targets, target_vocab, self.max_target_len)
+
+        d_vocab_size = len(drug_vocab) + 1
+        t_vocab_size = len(target_vocab) + 1
+        d = self.embedding_dim
+
+        # Trainable parameters.
+        drug_char_emb = rng.normal(0.0, 0.05, size=(d_vocab_size, d))
+        target_char_emb = rng.normal(0.0, 0.05, size=(t_vocab_size, d))
+        drug_bias = np.zeros((len(dataset.drugs),), dtype=np.float64)
+        target_bias = np.zeros((len(dataset.targets),), dtype=np.float64)
+
+        self.train_loss_history = []
+
+        for _ in range(self.epochs):
+            # Forward: raw strings -> trainable pooled vectors -> pair logits.
+            drug_vec = self._mean_embed(drug_tokens, drug_char_emb)
+            target_vec = self._mean_embed(target_tokens, target_char_emb)
+            logits = (drug_vec @ target_vec.T) + drug_bias[:, None] + target_bias[None, :]
+
+            if is_binary:
+                pred = _sigmoid(logits)
+                # BCE derivative wrt logits: pred - y
+                grad_logits = np.zeros_like(logits)
+                grad_logits[known_mask] = pred[known_mask] - y_train[known_mask]
+
+                p = np.clip(pred[known_mask], 1e-8, 1.0 - 1e-8)
+                t = y_train[known_mask]
+                data_loss = float(-np.mean(t * np.log(p) + (1.0 - t) * np.log(1.0 - p)))
+            else:
+                pred = logits
+                grad_logits = np.zeros_like(logits)
+                grad_logits[known_mask] = 2.0 * (pred[known_mask] - y_train[known_mask])
+                data_loss = float(np.mean((pred[known_mask] - y_train[known_mask]) ** 2))
+
+            # Normalize gradient by number of observed entries.
+            n_obs = float(max(1, int(known_mask.sum())))
+            grad_logits /= n_obs
+
+            d_drug_vec = grad_logits @ target_vec
+            d_target_vec = grad_logits.T @ drug_vec
+            d_drug_bias = grad_logits.sum(axis=1)
+            d_target_bias = grad_logits.sum(axis=0)
+
+            d_drug_char_emb = self._accumulate_char_grads(drug_tokens, d_drug_vec, d_vocab_size)
+            d_target_char_emb = self._accumulate_char_grads(target_tokens, d_target_vec, t_vocab_size)
+
+            # L2 regularization for stable optimization.
+            if self.l2 > 0.0:
+                d_drug_char_emb += self.l2 * drug_char_emb
+                d_target_char_emb += self.l2 * target_char_emb
+                d_drug_bias += self.l2 * drug_bias
+                d_target_bias += self.l2 * target_bias
+
+            drug_char_emb -= self.lr * d_drug_char_emb
+            target_char_emb -= self.lr * d_target_char_emb
+            drug_bias -= self.lr * d_drug_bias
+            target_bias -= self.lr * d_target_bias
+
+            self.train_loss_history.append(data_loss)
+
+        # Final inference with trained parameters.
+        drug_vec = self._mean_embed(drug_tokens, drug_char_emb)
+        target_vec = self._mean_embed(target_tokens, target_char_emb)
+        logits = (drug_vec @ target_vec.T) + drug_bias[:, None] + target_bias[None, :]
+
+        if is_binary:
+            return _sigmoid(logits).astype(np.float32)
+
+        return (logits * y_scale + y_shift).astype(np.float32)
 
 
 def create_predictor(model_name_or_cfg: Union[str, Dict]) -> DTIPredictor:
@@ -536,11 +870,12 @@ def create_predictor(model_name_or_cfg: Union[str, Dict]) -> DTIPredictor:
 
     Accepts either:
       - a plain model name string (legacy / simple usage), or
-      - a model config dict as read from YAML (preferred for real runs).
+            - a model config dict as read from YAML (preferred for dataset-backed runs).
 
     Supported model names:
       "simple_baseline"        -> SimpleMatrixDTIPredictor (fast, non-trainable)
             "dual_frozen_backbone"   -> DualFrozenBackbonePredictor (Phase-1 frozen embedding model)
+        "end_to_end_char_encoder" -> EndToEndCharEncoderPredictor (true trainable raw-string pipeline)
       "matrix_factorization"   -> MatrixFactorizationDTIPredictor (trainable)
             "mixhop_propagation"     -> MixHopPropagationDTIPredictor
             "interaction_cross_attention" -> InteractionCrossAttentionDTIPredictor
@@ -567,6 +902,17 @@ def create_predictor(model_name_or_cfg: Union[str, Dict]) -> DTIPredictor:
             seed=int(model_cfg.get("seed", 42)),
         )
 
+    if normalized_name == "end_to_end_char_encoder":
+        return EndToEndCharEncoderPredictor(
+            embedding_dim=int(model_cfg.get("embedding_dim", 64)),
+            epochs=int(model_cfg.get("epochs", 30)),
+            lr=float(model_cfg.get("lr", 0.05)),
+            max_drug_len=int(model_cfg.get("max_drug_len", 160)),
+            max_target_len=int(model_cfg.get("max_target_len", 2048)),
+            l2=float(model_cfg.get("l2", 1e-5)),
+            seed=int(model_cfg.get("seed", 42)),
+        )
+
     if normalized_name == "matrix_factorization":
         return MatrixFactorizationDTIPredictor(
             latent_dim=int(model_cfg.get("latent_dim", 32)),
@@ -579,6 +925,7 @@ def create_predictor(model_name_or_cfg: Union[str, Dict]) -> DTIPredictor:
         return MixHopPropagationDTIPredictor(
             top_k=int(model_cfg.get("top_k", 8)),
             hop_weights=list(model_cfg.get("hop_weights", [0.6, 0.3, 0.1])),
+            objective=str(model_cfg.get("objective", "auto")),
         )
 
     if normalized_name == "interaction_cross_attention":
@@ -589,9 +936,10 @@ def create_predictor(model_name_or_cfg: Union[str, Dict]) -> DTIPredictor:
             seed=int(model_cfg.get("seed", 42)),
             attention_temperature=float(model_cfg.get("attention_temperature", 1.0)),
             top_k=int(model_cfg.get("top_k", 8)),
+            objective=str(model_cfg.get("objective", "auto")),
         )
 
     raise ValueError(
         f"Unsupported model.name: {model_name!r}. "
-        "Must be one of: simple_baseline, dual_frozen_backbone, matrix_factorization, mixhop_propagation, interaction_cross_attention"
+        "Must be one of: simple_baseline, dual_frozen_backbone, end_to_end_char_encoder, matrix_factorization, mixhop_propagation, interaction_cross_attention"
     )
