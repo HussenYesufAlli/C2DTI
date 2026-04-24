@@ -70,7 +70,7 @@ $$
 and optionally L2-normalized:
 
 $$
-	ilde{z} = \frac{z}{\lVert z \rVert_2 + \epsilon}
+\tilde{z} = \frac{z}{\lVert z \rVert_2 + \epsilon}
 $$
 
 Implementation reference: [src/c2dti/backbones.py](src/c2dti/backbones.py) in SequenceViewEncoder.
@@ -141,7 +141,7 @@ $$
 S_{\text{unified}} = \frac{1}{1 + \max(L_{\text{total}}, 0)}
 $$
 
-where $\bar{L}_{\text{irm}}$ is the normalized IRM term used in the implementation for numeric stability.
+where $\bar{L}_{\text{irm}} = L_{\text{irm}} / \max(|L_{\text{irm}}|, 1)$ is the normalized IRM term used in the implementation for numeric stability.
 
 Implementation reference: [src/c2dti/unified_scorer.py](src/c2dti/unified_scorer.py) in UnifiedC2DTIScorer.score.
 
@@ -161,7 +161,7 @@ The Phase-6 matrix script enumerates dataset x split x ablation x seed combinati
 
 ### 3.4 Metrics
 
-Planned reporting metrics include CI, RMSE, Pearson, and Spearman, together with causal diagnostics from the unified objective.
+Reported regression metrics are CI, RMSE, Pearson, and Spearman. Reported binary metrics are AUROC, AUPRC, F1, Accuracy, Sensitivity, Specificity, and Precision. We also track causal diagnostics (cross-view, MAS, IRM, and counterfactual terms) from the unified objective for mechanism-level analysis.
 
 ## 4. Current Implementation Evidence (Draft)
 
@@ -171,7 +171,7 @@ Notebook-validated evidence currently confirms:
 3. IRM and counterfactual helper correctness.
 4. Unified scorer end-to-end execution and ablation responsiveness.
 
-Representative diagnostic values are available in notebook outputs and summarized in `docs/results_analysis.md`.
+Representative diagnostic values are available in notebook outputs and summarized in [docs/results_analysis.md](docs/results_analysis.md).
 
 ## 5. Results (Matrix Runs Completed)
 
@@ -198,9 +198,9 @@ Metrics reported: CI, RMSE, Pearson, Spearman.
 
 ### 5.2 Regression Ablation Summary
 
-Across the current implementation, FULL and ablated variants (NO_CAUSAL, NO_IRM, NO_CF, NO_MAS) are numerically very close on aggregate metrics for each dataset/split group. This indicates the present benchmark setting is currently dominated by the shared prediction backbone, with limited separation from lambda-level ablations in final task metrics.
+Across the current implementation, FULL and ablated variants (NO_CAUSAL, NO_IRM, NO_CF, NO_MAS) are effectively identical in aggregate endpoint metrics for each dataset/split group (same values to the reported precision in the compiled matrix summary). This indicates the present benchmark setting is dominated by the shared prediction backbone, with limited visible separation from lambda-level ablations in final task metrics.
 
-This should be interpreted as an implementation-state finding, not a final causal claim. Follow-up work should include stronger ablation stress tests (for example, wider lambda schedules, objective warmup variants, and causal-term calibration sweeps) to increase measurable divergence where expected.
+This should be interpreted as an implementation-state finding, not a final causal claim. Follow-up work should include stronger ablation stress tests (for example, wider lambda schedules, objective warmup variants, and causal-term calibration sweeps) and direct causal-term trajectory analysis to increase measurable divergence where expected.
 
 ### 5.3 Binary Classification Results (Aggregate Means)
 
@@ -221,9 +221,10 @@ Metrics reported: AUROC, AUPRC, F1, Accuracy, Sensitivity, Specificity, Precisio
 ### 5.4 Key Quantitative Observations
 
 1. Binary random-split performance is consistently high (AUROC 0.845-0.895 across datasets), confirming that the pipeline learns strong in-distribution classification signals.
-2. Cold-split binary performance drops relative to random splits, especially in specificity, indicating persistent class-imbalance and threshold calibration challenges under out-of-distribution settings.
-3. Regression results show strong DAVIS random correlation (Pearson 0.4001, Spearman 0.4044) with substantial degradation on cold splits, consistent with harder transfer regimes.
-4. Ablation-level metric collapse in regression indicates that next-phase causal analysis should rely on richer diagnostics (causal loss trajectories and intervention sensitivity), not only endpoint CI/RMSE/Pearson/Spearman.
+2. Binary AUROC drops under cold splits are clear and dataset-dependent: DAVIS drops from 0.8610 to 0.6498 (cold-drug) and 0.7880 (cold-target), KIBA drops from 0.8453 to 0.7282 and 0.7495, and BindingDB drops from 0.8947 to 0.8547 and 0.7392.
+3. Cold-split binary specificity is especially low in several groups (including zeros for DAVIS cold splits), indicating persistent class-imbalance and threshold calibration challenges under out-of-distribution settings.
+4. Regression results show strong DAVIS random correlation (Pearson 0.4001, Spearman 0.4044) with substantial degradation on cold splits, consistent with harder transfer regimes.
+5. Ablation-level metric collapse in regression indicates that next-phase causal analysis should rely on richer diagnostics (causal loss trajectories and intervention sensitivity), not only endpoint CI/RMSE/Pearson/Spearman.
 
 ## 6. Discussion (Updated)
 
