@@ -69,7 +69,8 @@ Store these artifacts before decision:
 Execution assets:
 
 - Run tracker: /home/hussen/MINDG/MINDG_CLASSA/doc/experiments/GRAPH_GATE_18_RUN_TRACKER_2026-04-22.md
-- Command generator: /home/hussen/MINDG/MINDG_CLASSA/scripts/run_graph_gate_matrix.py
+- Historical command generator (MINDG_CLASSA): run_graph_gate_matrix.py in the MINDG_CLASSA repository
+- Current C2DTI parity command generator: scripts/run_graph_parity_matrix.py
 
 ## 6. Recommended Decision for Current State
 
@@ -105,5 +106,5 @@ Action now:
 	## 8. C2DTI Parity Execution Note (2026-04-22)
 
 	- C2DTI parity matrix execution status: completed (18/18 run-once jobs).
-	- Tracking artifact: /home/hussen/MINDG/C2DTI/docs/C2DTI_GRAPH_PARITY_TRACKER_2026-04-22.md
+	- Tracking artifact: parity summaries under outputs/runs/ and compiled parity command sheet from scripts/run_graph_parity_matrix.py
 	- Interpretation: parity run confirms pipeline readiness, but current C2DTI metrics are generated on demo-scale data and should not override the MINDG_CLASSA full-data gate outcome.

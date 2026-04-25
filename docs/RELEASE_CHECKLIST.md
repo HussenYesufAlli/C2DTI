@@ -19,8 +19,8 @@ Reference commands:
 
 ```bash
 python -m unittest discover -s tests -p 'test_*.py'
-python scripts/run.py --config configs/davis_real_pipeline_strict.yaml --check-data
-python scripts/run.py --config configs/davis_real_pipeline_strict.yaml --run-once
+python scripts/run.py --config configs/davis_pipeline.yaml --check-data
+python scripts/run.py --config configs/davis_pipeline.yaml --run-once
 ```
 
 ## 3. Artifact Gate

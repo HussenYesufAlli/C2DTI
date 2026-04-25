@@ -33,8 +33,9 @@ matrix shape without starting the prediction pipeline.
 For MixHop-to-C2DTI migration decisions, use
 [docs/MIXHOP_TO_C2DTI_MIGRATION_GATE.md](docs/MIXHOP_TO_C2DTI_MIGRATION_GATE.md).
 
-For C2DTI-side parity execution tracking, use
-[docs/C2DTI_GRAPH_PARITY_TRACKER_2026-04-22.md](docs/C2DTI_GRAPH_PARITY_TRACKER_2026-04-22.md).
+For release sign-off and branch flow checks, use
+[docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) and
+[docs/REPO_WORKFLOW.md](docs/REPO_WORKFLOW.md).
 
 
 ## Phase 6 Evaluation Matrix
@@ -67,6 +68,34 @@ python scripts/compile_binary_results.py --prefix C2DTI_BINARY_EVAL_
 ```
 
 Outputs land in `outputs/reports/` and `outputs_binary/reports/` respectively.
+
+## Graph Parity Quick Commands
+
+Use the parity matrix generator directly:
+
+```bash
+# Print command sheet
+python scripts/run_graph_parity_matrix.py --mode dry-run
+
+# Execute dry-run validation across all parity configs
+python scripts/run_graph_parity_matrix.py --mode dry-run --execute
+
+# Execute full run-once parity matrix
+python scripts/run_graph_parity_matrix.py --mode run-once --execute
+```
+
+## Run Replay Quick Debug
+
+Replay one generated config end-to-end with summary outputs:
+
+```bash
+python scripts/run.py --config <generated_eval_config.yaml> --run-once
+```
+
+The most useful runtime evidence files are:
+1. `outputs/runs/<run-id>/summary.json`
+2. `outputs/runs/<run-id>/predictions.csv`
+3. `outputs/results_registry.csv`
 
 
 ## Current Focus

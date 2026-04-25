@@ -12,13 +12,15 @@ Drug-target interaction (DTI) prediction has improved with deep representation l
 
 Predicting drug-target interactions (DTIs) is central to drug discovery, repurposing, and safety screening. While deep learning has improved predictive performance, many DTI models overfit dataset-specific patterns and underperform in out-of-distribution scenarios such as cold-drug and cold-target splits. This creates a need for methods that are both accurate and causally robust.
 
+The key gap is that three strong baseline families often optimize prediction quality without explicitly enforcing cross-environment causal consistency: sequence-focused encoders (for example, DeepDTA-style and transformer-only variants) [CITATION:SEQ_BASELINES], graph-focused interaction models (for example, GraphDTA/MixHop-like propagation models) [CITATION:GRAPH_BASELINES], and multi-view fusion models that combine modalities but do not regularize invariance/counterfactual behavior [CITATION:MULTIVIEW_BASELINES]. In cold-drug and cold-target settings, these designs can rely on environment-specific shortcuts that do not transfer.
+
 C2DTI addresses this with four coordinated pillars:
 1. Dual backbone representations that encode complementary views.
 2. Cross-view causal agreement under perturbation.
 3. Masked autoencoder self-supervision to preserve modality structure.
 4. Invariant risk minimization and counterfactual rejection to reduce shortcut learning.
 
-The key contribution is not only each pillar individually, but their integration under a unified, ablation-ready objective compatible with practical benchmark workflows.
+Our explicit novelty is not just the presence of these components, but their joint execution inside one unified objective with direct lambda-based ablation, shared split control, and matrix-scale reproducibility hooks. This turns causal claims into testable protocol-level comparisons rather than isolated module descriptions.
 
 ### 1.1 Contributions
 
@@ -85,15 +87,28 @@ Figure 1 illustrates the full C2DTI pipeline. Drug SMILES and protein sequences 
 
 ### 3.1 Datasets
 
-Primary benchmark families include DAVIS, KIBA, and BindingDB variants as configured in repository pipelines.
+Primary benchmark families include DAVIS, KIBA, and BindingDB variants as configured in repository pipelines. For DAVIS/KIBA CSV layouts, required columns are Drug_ID, Drug, Target_ID, Target, and Y. Rows with missing identifiers or labels are dropped, IDs are converted to stable strings, and Y is parsed numerically. For BindingDB, Y values are interpreted as follows: if Y <= 1.0, values are treated as pre-binarized labels; otherwise values are interpreted as affinity in nM and converted to pKd with threshold 7.6 for binarization in the loader path.
 
 ### 3.2 Split Regimes
 
-Evaluation includes random, cold-drug, and cold-target splits to measure both in-distribution and transfer behavior.
+Evaluation includes random, cold-drug, and cold-target splits to measure both in-distribution and transfer behavior. The implementation-level split construction is:
+1. random: all observed pairs are shuffled with a fixed seed, then a test subset of size round(test_ratio x n_known) is held out.
+2. cold_drug: a test subset of active drugs is sampled, and all their observed pairs are assigned to test.
+3. cold_target: a test subset of active targets is sampled, and all their observed pairs are assigned to test.
+
+In all matrix runs, split.test_ratio=0.2 and seeds are {10, 34, 42}.
 
 ### 3.3 Matrix Design
 
-The Phase-6 matrix script enumerates dataset x split x ablation x seed combinations and generates execution-ready configs and command sheets.
+The Phase-6 matrix scripts enumerate execution-ready configs as:
+1. Regression: 3 datasets x 3 splits x 5 ablations x 3 seeds = 135 runs.
+2. Binary: 3 datasets x 3 splits x 3 seeds = 27 runs.
+
+Regression ablations are full, no_causal, no_irm, no_cf, and no_mas, implemented by setting corresponding lambda terms in the unified causal config.
+
+Model settings in the base unified causal config are interaction_cross_attention with latent_dim=16, epochs=5, lr=0.01, attention_temperature=1.0, top_k=8, model seed=42, perturbation strength=0.10. Causal defaults are lambda_xview=1.0, lambda_mas=1.0, lambda_irm=1.0, lambda_cf=1.0, graph_model=mixhop_propagation (hop_weights [0.6, 0.3, 0.1]), MAS mask_ratio=0.15, and IRM/CF n_envs=4, n_cf_pairs=1000.
+
+Binary matrix base settings use simple_baseline with split.test_ratio=0.2, split seeds {10, 34, 42}, and decision threshold=0.5.
 
 ### 3.4 Metrics
 
@@ -122,19 +137,19 @@ Representative diagnostic values are available in notebook outputs and summarize
 
 ## 5. Results (Current Aggregate Tables)
 
-### 5.1 Regression Results (FULL, mean over seeds)
+### 5.1 Regression Results (FULL, mean +/- std over seeds)
 
-| dataset | split | n_runs | ci_mean | rmse_mean | pearson_mean | spearman_mean |
+| dataset | split | n_runs | ci_mean+/-std | rmse_mean+/-std | pearson_mean+/-std | spearman_mean+/-std |
 | --- | --- | --- | --- | --- | --- | --- |
-| BINDINGDB | COLD_DRUG | 3 | 0.4092 | 0.0603 | 0.0042 | 0.0008 |
-| BINDINGDB | COLD_TARGET | 3 | 0.5047 | 0.0583 | 0.0020 | -0.0001 |
-| BINDINGDB | RANDOM | 3 | 0.4814 | 0.0589 | 0.0041 | -0.0001 |
-| DAVIS | COLD_DRUG | 3 | 0.4959 | 7152.2611 | -0.0016 | -0.0066 |
-| DAVIS | COLD_TARGET | 3 | 0.5043 | 7619.2996 | 0.0156 | 0.0081 |
-| DAVIS | RANDOM | 3 | 0.7222 | 3663.3506 | 0.4001 | 0.4044 |
-| KIBA | COLD_DRUG | 3 | 0.5014 | 5.9100 | 0.0191 | 0.0029 |
-| KIBA | COLD_TARGET | 3 | 0.4887 | 5.9043 | -0.0274 | -0.0180 |
-| KIBA | RANDOM | 3 | 0.5039 | 5.8973 | 0.0185 | 0.0082 |
+| BINDINGDB | COLD_DRUG | 3 | 0.4092+/-0.0702 | 0.0603+/-0.0036 | 0.0042+/-0.0006 | 0.0008+/-0.0004 |
+| BINDINGDB | COLD_TARGET | 3 | 0.5047+/-0.0502 | 0.0583+/-0.0012 | 0.0020+/-0.0037 | -0.0001+/-0.0015 |
+| BINDINGDB | RANDOM | 3 | 0.4814+/-0.0211 | 0.0589+/-0.0002 | 0.0041+/-0.0008 | -0.0001+/-0.0010 |
+| DAVIS | COLD_DRUG | 3 | 0.4959+/-0.0404 | 7152.2611+/-675.5801 | -0.0016+/-0.0582 | -0.0066+/-0.0761 |
+| DAVIS | COLD_TARGET | 3 | 0.5043+/-0.0254 | 7619.2996+/-891.0913 | 0.0156+/-0.0367 | 0.0081+/-0.0448 |
+| DAVIS | RANDOM | 3 | 0.7222+/-0.0173 | 3663.3506+/-36.7645 | 0.4001+/-0.0336 | 0.4044+/-0.0362 |
+| KIBA | COLD_DRUG | 3 | 0.5014+/-0.0041 | 5.9100+/-0.0029 | 0.0191+/-0.0048 | 0.0029+/-0.0006 |
+| KIBA | COLD_TARGET | 3 | 0.4887+/-0.0076 | 5.9043+/-0.0963 | -0.0274+/-0.0611 | -0.0180+/-0.0188 |
+| KIBA | RANDOM | 3 | 0.5039+/-0.0051 | 5.8973+/-0.0035 | 0.0185+/-0.0088 | 0.0082+/-0.0017 |
 
 ### 5.2 Regression Ablation Example (DAVIS, RANDOM)
 
@@ -148,19 +163,27 @@ Representative diagnostic values are available in notebook outputs and summarize
 
 ### 5.3 Binary Results (mean over seeds)
 
-| dataset | split | n_runs | auroc_mean | auprc_mean | f1_mean | accuracy_mean | sensitivity_mean | specificity_mean | precision_mean |
+| dataset | split | n_runs | auroc_mean+/-std | auprc_mean+/-std | f1_mean+/-std | accuracy_mean+/-std | sensitivity_mean+/-std | specificity_mean+/-std | precision_mean+/-std |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| BINDINGDB | COLD_DRUG | 3 | 0.8547 | 0.9684 | 0.9405 | 0.8882 | 0.9993 | 0.0327 | 0.8883 |
-| BINDINGDB | COLD_TARGET | 3 | 0.7392 | 0.9352 | 0.9364 | 0.8818 | 0.9944 | 0.0853 | 0.8849 |
-| BINDINGDB | RANDOM | 3 | 0.8947 | 0.9826 | 0.9556 | 0.9172 | 0.9923 | 0.2532 | 0.9215 |
-| DAVIS | COLD_DRUG | 3 | 0.6498 | 0.9478 | 0.9592 | 0.9217 | 1.0000 | 0.0000 | 0.9217 |
-| DAVIS | COLD_TARGET | 3 | 0.7880 | 0.9741 | 0.9625 | 0.9277 | 1.0000 | 0.0000 | 0.9277 |
-| DAVIS | RANDOM | 3 | 0.8610 | 0.9859 | 0.9633 | 0.9291 | 1.0000 | 0.0000 | 0.9291 |
-| KIBA | COLD_DRUG | 3 | 0.7282 | 0.9030 | 0.8849 | 0.7936 | 1.0000 | 0.0003 | 0.7936 |
-| KIBA | COLD_TARGET | 3 | 0.7495 | 0.9102 | 0.8978 | 0.8152 | 0.9999 | 0.0129 | 0.8149 |
-| KIBA | RANDOM | 3 | 0.8453 | 0.9521 | 0.9006 | 0.8219 | 0.9982 | 0.0779 | 0.8204 |
+| BINDINGDB | COLD_DRUG | 3 | 0.8547+/-0.0238 | 0.9684+/-0.0095 | 0.9405+/-0.0014 | 0.8882+/-0.0024 | 0.9993+/-0.0002 | 0.0327+/-0.0048 | 0.8883+/-0.0024 |
+| BINDINGDB | COLD_TARGET | 3 | 0.7392+/-0.0245 | 0.9352+/-0.0218 | 0.9364+/-0.0138 | 0.8818+/-0.0242 | 0.9944+/-0.0024 | 0.0853+/-0.0144 | 0.8849+/-0.0231 |
+| BINDINGDB | RANDOM | 3 | 0.8947+/-0.0095 | 0.9826+/-0.0026 | 0.9556+/-0.0028 | 0.9172+/-0.0047 | 0.9923+/-0.0019 | 0.2532+/-0.0143 | 0.9215+/-0.0037 |
+| DAVIS | COLD_DRUG | 3 | 0.6498+/-0.0254 | 0.9478+/-0.0163 | 0.9592+/-0.0104 | 0.9217+/-0.0191 | 1.0000+/-0.0000 | 0.0000+/-0.0000 | 0.9217+/-0.0191 |
+| DAVIS | COLD_TARGET | 3 | 0.7880+/-0.0148 | 0.9741+/-0.0040 | 0.9625+/-0.0029 | 0.9277+/-0.0054 | 1.0000+/-0.0000 | 0.0000+/-0.0000 | 0.9277+/-0.0054 |
+| DAVIS | RANDOM | 3 | 0.8610+/-0.0074 | 0.9859+/-0.0011 | 0.9633+/-0.0015 | 0.9291+/-0.0028 | 1.0000+/-0.0000 | 0.0000+/-0.0000 | 0.9291+/-0.0028 |
+| KIBA | COLD_DRUG | 3 | 0.7282+/-0.0045 | 0.9030+/-0.0068 | 0.8849+/-0.0065 | 0.7936+/-0.0105 | 1.0000+/-0.0001 | 0.0003+/-0.0003 | 0.7936+/-0.0105 |
+| KIBA | COLD_TARGET | 3 | 0.7495+/-0.0154 | 0.9102+/-0.0178 | 0.8978+/-0.0170 | 0.8152+/-0.0279 | 0.9999+/-0.0001 | 0.0129+/-0.0121 | 0.8149+/-0.0279 |
+| KIBA | RANDOM | 3 | 0.8453+/-0.0042 | 0.9521+/-0.0033 | 0.9006+/-0.0037 | 0.8219+/-0.0061 | 0.9982+/-0.0003 | 0.0779+/-0.0038 | 0.8204+/-0.0059 |
 
-### 5.4 Current Observations
+### 5.4 Best-Per-Split Summary (Compact)
+
+| split | best_regression_dataset_by_CI | best_regression_CI_mean+/-std | best_binary_dataset_by_AUROC | best_binary_AUROC_mean+/-std |
+| --- | --- | --- | --- | --- |
+| COLD_DRUG | KIBA | 0.5014+/-0.0041 | BINDINGDB | 0.8547+/-0.0238 |
+| COLD_TARGET | BINDINGDB | 0.5047+/-0.0502 | DAVIS | 0.7880+/-0.0148 |
+| RANDOM | DAVIS | 0.7222+/-0.0173 | BINDINGDB | 0.8947+/-0.0095 |
+
+### 5.5 Current Observations
 
 1. Random splits generally outperform cold splits, indicating expected distribution-shift sensitivity.
 2. Regression ablation separation is currently weak in aggregated outputs and needs deeper causal-diagnostic analysis.
@@ -168,26 +191,56 @@ Representative diagnostic values are available in notebook outputs and summarize
 
 ## 6. Discussion (Draft)
 
-Expected findings to examine:
-1. Whether cross-view agreement improves robustness in cold splits.
-2. Whether MAS contributes stable gains versus objective-only variants.
-3. Whether IRM and counterfactual terms reduce shortcut behavior without harming base accuracy.
+### 6.1 Failure Analysis Under Distribution Shift
 
-Potential limitations:
-1. Runtime cost of full matrix evaluation.
-2. Sensitivity to lambda tuning.
-3. Dataset-specific imbalance effects.
+Cold-drug and cold-target failures are consistent with representation transfer stress. In regression, DAVIS cold splits show large RMSE variance, suggesting that latent mapping quality is unstable when either the drug or target identity is fully unseen. In binary settings, specificity is frequently near zero (especially DAVIS splits), indicating a strong positive-class bias at the default threshold 0.5. This pattern is consistent with class imbalance and score calibration drift: the model maintains high recall by predicting positives aggressively, which inflates false positives in negative-sparse test folds.
+
+### 6.2 Why Specificity Is Low In Binary Runs
+
+Three interacting factors explain low specificity:
+1. Class distribution skew in test folds increases penalty asymmetry between false negatives and false positives in practical optimization.
+2. Fixed thresholding (0.5) is not split-adaptive, so calibration mismatch under cold shifts directly lowers true-negative rate.
+3. Representation uncertainty for unseen drugs/targets compresses score separation, reducing negative-class margin.
+
+Actionable next step is threshold sweeping and calibration-by-split (for example, Platt/isotonic calibration) with specificity-recall operating-point reporting [CITATION:CALIBRATION_METHODS].
+
+### 6.3 Limitations
+
+This study has three explicit limitations. First, dataset bias may persist due to benchmark curation artifacts and scaffold/sequence redundancy [CITATION:DATA_BIAS_DTI]. Second, class imbalance materially affects thresholded binary behavior, especially specificity. Third, full matrix execution is computationally expensive (162 total runs across regression and binary matrices), which constrains broad hyperparameter sweeps.
 
 ## 7. Reproducibility Notes
 
-Reproducibility is supported by:
-1. Config-driven objective and model modes.
-2. Scripted matrix generation and result compilation.
-3. Notebook-based module-level validation before long-running experiments.
+Reproducibility is supported by explicit command sets, tracked configs, and version pinning.
+
+### 7.1 Exact Command Set
+
+1. Regression matrix execute:
+	python scripts/run_eval_matrix.py --mode run-once --execute
+2. Binary matrix execute:
+	python scripts/run_binary_eval_matrix.py --mode run-once --execute
+3. Regression report compile:
+	python scripts/compile_results.py --prefix C2DTI_EVAL_
+4. Binary report compile:
+	python scripts/compile_binary_results.py --prefix C2DTI_BINARY_EVAL_
+
+Optional capped run command for fast validation:
+1. python scripts/run_eval_matrix.py --mode run-once --execute --max-runs 3
+2. python scripts/run_binary_eval_matrix.py --mode run-once --execute --max-runs 3
+
+### 7.2 Config References
+
+1. Unified regression base config: configs/davis_unified_causal_gate.yaml
+2. Regression generated matrix configs: configs/generated_eval_matrix/*.yaml
+3. Binary base config: configs/davis_binary_baseline.yaml
+4. Binary generated matrix configs: configs/generated_binary_eval_matrix/*.yaml
+
+### 7.3 Versioning Note
+
+Results in this draft correspond to repository branch dev at commit e394650. Final camera-ready reporting should lock requirements and include exact environment manifest hash [CITATION:REPRO_STANDARDS].
 
 ## 8. Conclusion (Draft)
 
-C2DTI provides an integrated causal DTI pipeline that is implementation-complete at module level and ready for full benchmark execution. The next milestone is filling benchmark tables from matrix runs and finalizing quantitative claims for submission.
+C2DTI demonstrates a fully executable causal DTI framework with matrix-scale evidence across random, cold-drug, and cold-target settings. The clearest takeaway is that random-split performance is consistently stronger than cold-split performance, confirming that distribution shift remains the core difficulty despite causal regularization. The unified objective and ablation wiring make this gap measurable and directly optimizable rather than anecdotal. A concrete next step is split-aware calibration and threshold optimization to recover specificity without sacrificing AUROC/AUPRC.
 
 ## Appendix A: Execution Checklist
 
