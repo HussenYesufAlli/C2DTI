@@ -1,0 +1,20 @@
+name: bindingdb_kd_regression_emb
+protocol: P1
+
+dataset:
+  name: BindingDB_Kd
+  path: datasets/BindingDB_Kd.csv
+  allow_placeholder: false
+
+model:
+  name: dual_frozen_backbone
+  drug_embedding_path: data/embeddings/BindingDB_Kd_drug_emb.npz
+  target_embedding_path: data/embeddings/BindingDB_Kd_target_emb.npz
+
+split:
+  strategy: random
+  test_ratio: 0.2
+  seed: 42
+
+output:
+  base_dir: outputs

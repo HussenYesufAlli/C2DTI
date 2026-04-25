@@ -1,0 +1,39 @@
+name: C2DTI_DAVIS_CROSS_VIEW_CAUSAL_GATE
+protocol: P1
+output:
+  base_dir: outputs
+dataset:
+  name: DAVIS
+  path: datasets/DAVIS.csv
+  allow_placeholder: true
+model:
+  # Main prediction model used for standard evaluation metrics.
+  name: interaction_cross_attention
+  latent_dim: 16
+  epochs: 5
+  lr: 0.01
+  seed: 42
+  attention_temperature: 1.0
+  top_k: 8
+split:
+  strategy: random
+  test_ratio: 0.2
+  seed: 42
+perturbation:
+  strength: 0.10
+  seed: 42
+causal:
+  enabled: true
+  mode: cross_view
+  weight: 1.0
+  # Sequence view from Phase-1 frozen backbone path.
+  # If NPZ paths are missing, model falls back to deterministic hash features.
+  sequence_model:
+    name: dual_frozen_backbone
+    fusion_alpha: 0.7
+    seed: 42
+  # Graph view branch.
+  graph_model:
+    name: mixhop_propagation
+    top_k: 8
+    hop_weights: [0.6, 0.3, 0.1]

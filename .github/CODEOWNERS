@@ -1,0 +1,15 @@
+# Default owner for the repository
+* @HussenYesufAlli
+
+# Core implementation
+/src/ @HussenYesufAlli
+/scripts/ @HussenYesufAlli
+/configs/ @HussenYesufAlli
+/tests/ @HussenYesufAlli
+
+# Governance and process docs
+/.github/ @HussenYesufAlli
+/docs/ @HussenYesufAlli
+/README.md @HussenYesufAlli
+/CONTRIBUTING.md @HussenYesufAlli
+/CHANGELOG.md @HussenYesufAlli

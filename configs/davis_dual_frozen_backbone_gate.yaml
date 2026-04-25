@@ -1,0 +1,21 @@
+name: C2DTI_DAVIS_DUAL_FROZEN_BACKBONE_GATE
+protocol: P1
+output:
+  base_dir: outputs
+dataset:
+  name: DAVIS
+  path: datasets/DAVIS.csv
+  allow_placeholder: true
+model:
+  name: dual_frozen_backbone
+  fusion_alpha: 0.7
+  seed: 42
+  max_calibration_samples: 200000
+  # Optional pretrained embedding tables (NPZ). If omitted or missing,
+  # the model falls back to deterministic hash embeddings.
+  # chemberta_npz_path: path/to/chemberta_embeddings.npz
+  # ankh_npz_path: path/to/ankh_embeddings.npz
+split:
+  strategy: random
+  test_ratio: 0.2
+  seed: 42

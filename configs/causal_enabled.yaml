@@ -1,0 +1,7 @@
+name: C2DTI_CAUSAL_ENABLED
+protocol: P0
+output:
+  base_dir: outputs
+causal:
+  enabled: true
+  weight: 0.5

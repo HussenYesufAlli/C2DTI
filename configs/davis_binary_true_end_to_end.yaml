@@ -1,0 +1,29 @@
+name: davis_binary_true_end_to_end
+protocol: P_binary
+
+dataset:
+  name: DAVIS
+  path: datasets/DAVIS_binary.csv
+  allow_placeholder: false
+
+model:
+  # True end-to-end path: learns trainable encoders from raw strings.
+  name: end_to_end_char_encoder
+  embedding_dim: 64
+  epochs: 25
+  lr: 0.05
+  max_drug_len: 160
+  max_target_len: 2048
+  l2: 0.0001
+  seed: 42
+
+split:
+  strategy: random
+  test_ratio: 0.2
+  seed: 42
+
+binary:
+  threshold: 0.5
+
+output:
+  base_dir: outputs_binary

@@ -1,0 +1,23 @@
+name: bindingdb_kd_binary_emb
+protocol: P_binary
+
+dataset:
+  name: BindingDB_Kd
+  path: datasets/BindingDB_Kd_binary.csv
+  allow_placeholder: false
+
+model:
+  name: dual_frozen_backbone
+  drug_embedding_path: data/embeddings/BindingDB_Kd_drug_emb.npz
+  target_embedding_path: data/embeddings/BindingDB_Kd_target_emb.npz
+
+split:
+  strategy: random
+  test_ratio: 0.2
+  seed: 42
+
+binary:
+  threshold: 0.5
+
+output:
+  base_dir: outputs_binary

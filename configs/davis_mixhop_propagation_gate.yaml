@@ -1,0 +1,16 @@
+name: C2DTI_DAVIS_MIXHOP_PROPAGATION_GATE
+protocol: P1
+output:
+  base_dir: outputs
+dataset:
+  name: DAVIS
+  path: datasets/DAVIS.csv
+  allow_placeholder: true
+model:
+  name: mixhop_propagation
+  top_k: 8
+  hop_weights: [0.6, 0.3, 0.1]
+split:
+  strategy: random
+  test_ratio: 0.2
+  seed: 42

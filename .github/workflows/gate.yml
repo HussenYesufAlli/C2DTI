@@ -1,0 +1,45 @@
+name: gate
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - feature/**
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unified gate
+        run: make gate-all
+
+      - name: Generate gate summary
+        run: make gate-summary
+
+      - name: Upload gate evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-evidence
+          path: |
+            outputs/gates/**
+            outputs/checks/**
+          if-no-files-found: warn

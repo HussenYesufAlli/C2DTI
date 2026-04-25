@@ -1,0 +1,20 @@
+name: davis_regression_emb
+protocol: P1
+
+dataset:
+  name: DAVIS
+  path: datasets/DAVIS.csv
+  allow_placeholder: false
+
+model:
+  name: dual_frozen_backbone
+  drug_embedding_path: data/embeddings/DAVIS_drug_emb.npz
+  target_embedding_path: data/embeddings/DAVIS_target_emb.npz
+
+split:
+  strategy: random
+  test_ratio: 0.2
+  seed: 42
+
+output:
+  base_dir: outputs
