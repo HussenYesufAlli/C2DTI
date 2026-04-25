@@ -5,9 +5,9 @@ from typing import List, Tuple
 
 
 DEFAULT_CONFIGS = [
-    "configs/davis_real_pipeline_strict.yaml",
-    "configs/bindingdb_real_pipeline_strict.yaml",
-    "configs/kiba_real_pipeline_strict.yaml",
+    "configs/davis_gate.yaml",
+    "configs/bindingdb_gate.yaml",
+    "configs/kiba_gate.yaml",
 ]
 
 
@@ -19,7 +19,7 @@ def _resolve_configs(cli_configs: List[str]) -> List[str]:
 
 
 def _run_once(config_path: str) -> int:
-    """Run one strict config through the run-once path."""
+    """Run one config through the run-once path."""
     cmd = [sys.executable, "scripts/run.py", "--config", config_path, "--run-once"]
     completed = subprocess.run(cmd, check=False)
     return int(completed.returncode)
@@ -31,7 +31,7 @@ def main() -> None:
         "--configs",
         nargs="*",
         default=None,
-        help="Optional config list; defaults to strict DAVIS/BindingDB/KIBA configs.",
+        help="Optional config list; defaults to DAVIS/BindingDB/KIBA gate configs.",
     )
     args = parser.parse_args()
 

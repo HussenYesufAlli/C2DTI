@@ -1,5 +1,6 @@
 import argparse
 import json
+import shlex
 import subprocess
 import sys
 import time
@@ -34,6 +35,13 @@ def _run_step(name: str, command: Sequence[str]) -> Dict[str, Any]:
         "status": status,
         "duration_sec": duration_sec,
     }
+
+
+def _normalize_command(command: Sequence[str]) -> List[str]:
+    """Normalize argparse token sequences, including single quoted command strings."""
+    if len(command) == 1 and " " in command[0]:
+        return shlex.split(command[0])
+    return list(command)
 
 
 def _write_report(report_path: Path, payload: Dict[str, Any]) -> None:
@@ -77,20 +85,24 @@ def main() -> None:
     report_path = Path(args.report_path) if args.report_path else _default_report_path()
     started_at = _now_utc_iso()
 
+    verify_cmd = _normalize_command(args.verify_cmd)
+    real_cmd = _normalize_command(args.real_cmd)
+    validate_cmd = _normalize_command(args.validate_cmd)
+
     print("[INFO] Running unified quality gate...")
     step_results: List[Dict[str, Any]] = []
 
     # Step order intentionally enforces fast feedback before strict pipeline checks.
-    step_results.append(_run_step("verify", args.verify_cmd))
+    step_results.append(_run_step("verify", verify_cmd))
     if step_results[-1]["return_code"] == 0:
-        step_results.append(_run_step("real-all", args.real_cmd))
+        step_results.append(_run_step("real-all", real_cmd))
         if step_results[-1]["return_code"] == 0:
-            step_results.append(_run_step("validate-outputs", args.validate_cmd))
+            step_results.append(_run_step("validate-outputs", validate_cmd))
         else:
             step_results.append(
                 {
                     "name": "validate-outputs",
-                    "command": list(args.validate_cmd),
+                    "command": validate_cmd,
                     "return_code": None,
                     "status": "SKIPPED",
                     "duration_sec": 0.0,
@@ -101,7 +113,7 @@ def main() -> None:
         step_results.append(
             {
                 "name": "real-all",
-                "command": list(args.real_cmd),
+                "command": real_cmd,
                 "return_code": None,
                 "status": "SKIPPED",
                 "duration_sec": 0.0,
@@ -110,7 +122,7 @@ def main() -> None:
         step_results.append(
             {
                 "name": "validate-outputs",
-                "command": list(args.validate_cmd),
+                "command": validate_cmd,
                 "return_code": None,
                 "status": "SKIPPED",
                 "duration_sec": 0.0,

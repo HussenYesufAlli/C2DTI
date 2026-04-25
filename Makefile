@@ -168,7 +168,7 @@ gate-bundle:
 	$(PYTHON) scripts/gate_bundle.py
 
 gate-all:
-	$(PYTHON) scripts/gate_all.py --real-cmd "make real-all-gate"
+	$(PYTHON) scripts/gate_all.py --real-cmd make real-all-gate
 
 supervisor-workflow:
 	bash scripts/run_supervisor_workflow.sh
