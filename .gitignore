@@ -21,7 +21,21 @@ env/
 Thumbs.db
 
 # Build and runtime artifacts
-outputs/
+# Use glob (not trailing slash) so sub-exceptions below are respected by git
+outputs/*
+!outputs/runs/
+outputs/runs/*
+!outputs/runs/.gitkeep
+!outputs/reports/
+outputs/reports/*
+!outputs/reports/*.csv
+!outputs/gates/
+outputs/gates/*
+!outputs/gates/latest_gate_summary.md
+!outputs/checks/
+outputs/checks/*
+!outputs/checks/*.json
+!outputs/results_registry.csv
 models/*
 !models/.gitkeep
 !models/embeddings/
