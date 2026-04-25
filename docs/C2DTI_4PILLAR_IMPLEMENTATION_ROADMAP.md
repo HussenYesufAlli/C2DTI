@@ -1,4 +1,15 @@
-# C2DTI 4-Pillar Implementation Roadmap → Top Journal Paper
+# C2DTI 4-Pillar Implementation Roadmap -> Top Journal Paper
+
+## Status Snapshot (2026-04-25)
+
+This roadmap now reflects the current repository implementation state.
+
+Current state summary:
+1. Core pillar modules are implemented in the existing runtime path (`runner.py` / `binary_runner.py` / `causal_runtime.py` / `unified_scorer.py`).
+2. Regression evaluation matrix is implemented and executed at 135 runs (3 datasets x 3 splits x 5 ablations x 3 seeds).
+3. Binary evaluation matrix is implemented and executed at 27 runs (3 datasets x 3 splits x 3 seeds).
+4. Report compilation scripts exist for both regression and binary outputs.
+5. Manuscript drafting is active in docs paper draft files, with v2 refinement in progress.
 
 ## Architecture Overview
 
@@ -125,7 +136,7 @@ $$L_{XVIEW} = \text{MSE}(p_{seq}, p_{graph}) + \text{MSE}(p_{seq\_pert}, p_{grap
 
 **Files to create/modify:**
 - `src/c2dti/causal_objective.py` — Implement real cross-view loss (replace placeholder)
-- `src/c2dti/training_loop.py` — New file, orchestrate multi-loss training
+- `src/c2dti/causal_runtime.py` — Runtime orchestration for multi-component causal outputs
 
 **Unit tests:** Check perturbation changes predictions, loss decreases over iterations
 
@@ -352,21 +363,30 @@ $$L_{total} = L_{BCE} + \lambda_{xview} \cdot L_{XVIEW} + \lambda_{mas} \cdot (L
                      f"CF={losses['cf']:.4f}")
    ```
 
-**Files to create:**
-- `src/c2dti/unified_model.py` — Complete C2DTI model
-- `src/c2dti/training.py` — Training loop
+**Files to create/modify:**
+- `src/c2dti/runner.py` — Main regression runtime entry path
+- `src/c2dti/binary_runner.py` — Main binary runtime entry path
+- `src/c2dti/unified_scorer.py` — Unified multi-pillar scoring path
 
 ---
 
 ### Phase 6: Comprehensive Evaluation
 
-**Evaluation Matrix:**
+**Regression Evaluation Matrix:**
 ```
 3 datasets (DAVIS, KIBA, BindingDB)
 × 3 split strategies (random, cold_drug, cold_target)
 × 5 ablations (full, -causal, -irm, -cf, -mas)
 × 3 seeds (10, 34, 42)
 = 135 total runs
+```
+
+**Binary Evaluation Matrix:**
+```
+3 datasets (DAVIS, KIBA, BindingDB)
+× 3 split strategies (random, cold_drug, cold_target)
+× 3 seeds (10, 34, 42)
+= 27 total runs
 ```
 
 **Baselines to compare:**
@@ -378,16 +398,18 @@ $$L_{total} = L_{BCE} + \lambda_{xview} \cdot L_{XVIEW} + \lambda_{mas} \cdot (L
 
 **Metrics:** CI (primary), RMSE, Pearson, Spearman
 
-**Ablation configs:**
-- `c2dti_full.yaml` — All 4 pillars
-- `c2dti_no_causal.yaml` — Remove Pillar 2 (XVIEW)
-- `c2dti_no_irm.yaml` — Remove Pillar 4 (IRM)
-- `c2dti_no_cf.yaml` — Remove Pillar 4 (CF only)
-- `c2dti_no_mas.yaml` — Remove Pillar 3 (MAS)
+**Ablation config generation path:**
+- Base config: `configs/davis_unified_causal_gate.yaml`
+- Generated regression matrix configs: `configs/generated_eval_matrix/*.yaml`
+- Ablations are applied by lambda control (`lambda_xview`, `lambda_irm`, `lambda_cf`, `lambda_mas`) in generated configs.
+- Base binary config: `configs/davis_binary_baseline.yaml`
+- Generated binary matrix configs: `configs/generated_binary_eval_matrix/*.yaml`
 
-**Files to create:**
-- `scripts/run_eval_matrix.py` — Automated evaluation pipeline
-- `scripts/compile_results.py` — Aggregate results into tables
+**Files to create/modify:**
+- `scripts/run_eval_matrix.py` — Automated regression evaluation pipeline
+- `scripts/run_binary_eval_matrix.py` — Automated binary evaluation pipeline
+- `scripts/compile_results.py` — Aggregate regression results into tables
+- `scripts/compile_binary_results.py` — Aggregate binary results into tables
 
 ---
 
@@ -452,53 +474,57 @@ Week 6:    Phase 7 (Paper writing + revision)
 
 ---
 
-## Success Criteria for Top Journal
+## Success Criteria for Top Journal (Updated)
 
 ✅ **Must have:**
-- All 4 pillars implemented and integrated
-- 135-run evaluation matrix completed
-- CI improvements ≥3% over baselines on all datasets
-- Ablations show each pillar contributes >1% CI
+- All 4 pillars implemented and integrated in one reproducible runtime path
+- Regression (135) and binary (27) matrix runs completed and compiled
+- Full result tables report uncertainty across seeds (mean +/- std or CI)
+- Reproducibility section includes exact commands, config references, and commit hash
 
 ✅ **Should have:**
-- Statistical significance (p < 0.05) on CI improvements
-- Robustness curves (CI vs perturbation strength)
-- Visualization of learned representations
+- Statistical significance testing for key comparisons
+- Robustness curves (for example CI vs perturbation strength)
+- Representation and error-analysis visualizations
 
 ✅ **Nice to have:**
-- Pre-registered experiments
-- Reproducibility package on GitHub
-- Interactive results dashboard
+- Pre-registered experiment protocol
+- Public reproducibility bundle (configs, command sheets, reports)
+- Interactive dashboard for split/ablation exploration
 
 ---
 
-## Files to Create Summary
+## Files and Artifact Summary (Current)
 
 ```
 src/c2dti/
-  ├── backbones.py                    (NEW: SequenceViewEncoder, MASHead)
-  ├── causal_objective.py             (MODIFY: Real cross-view loss)
-  ├── irm_loss.py                     (NEW: IRM + CF losses)
-  ├── unified_model.py                (NEW: Complete C2DTI model)
-  ├── training.py                     (NEW: Training loop)
-  ├── dataset_loader.py               (MODIFY: Add CF augmentation, tokenization)
+    ├── backbones.py                    (Implemented: sequence backbones + MAS components)
+    ├── causal_objective.py             (Implemented: cross-view + MAS + helpers)
+    ├── irm_loss.py                     (Implemented: IRM + CF losses)
+    ├── causal_runtime.py               (Implemented: causal runtime orchestration)
+    ├── unified_scorer.py               (Implemented: unified 4-pillar scoring)
+    ├── runner.py                       (Implemented: regression runtime)
+    ├── binary_runner.py                (Implemented: binary runtime)
+    ├── dataset_loader.py               (Implemented: CSV loaders + fallback handling)
   └── ...existing files...
 
 scripts/
-  ├── run_eval_matrix.py              (NEW: 135-run automation)
-  ├── compile_results.py              (NEW: Results aggregation)
+    ├── run_eval_matrix.py              (Implemented: 135-run regression automation)
+    ├── run_binary_eval_matrix.py       (Implemented: 27-run binary automation)
+    ├── compile_results.py              (Implemented: regression aggregation)
+    ├── compile_binary_results.py       (Implemented: binary aggregation)
   └── ...existing scripts...
 
 configs/
-  ├── c2dti_full.yaml                 (NEW)
-  ├── c2dti_no_causal.yaml            (NEW)
-  ├── c2dti_no_irm.yaml               (NEW)
-  ├── c2dti_no_cf.yaml                (NEW)
-  ├── c2dti_no_mas.yaml               (NEW)
+    ├── davis_unified_causal_gate.yaml      (Base unified regression config)
+    ├── davis_binary_baseline.yaml          (Base binary config)
+    ├── generated_eval_matrix/*.yaml        (Generated regression matrix configs)
+    ├── generated_binary_eval_matrix/*.yaml (Generated binary matrix configs)
   └── ...existing configs...
 
 docs/
-  ├── C2DTI_4PILLAR_IMPLEMENTATION_ROADMAP.md  (THIS FILE)
-  ├── results_analysis.md             (NEW: Ablation results analysis)
-  └── paper_draft.md                  (NEW: Manuscript outline)
+    ├── C2DTI_4PILLAR_IMPLEMENTATION_ROADMAP.md  (This file, status-updated)
+    ├── results_analysis.md             (Implemented and active)
+    ├── paper_draft.md                  (Implemented and active)
+    └── paper_drafr_v2.md               (Active v2 manuscript refinement)
 ```
