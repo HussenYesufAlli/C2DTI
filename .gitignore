@@ -22,7 +22,11 @@ Thumbs.db
 
 # Build and runtime artifacts
 outputs/
-models/
+models/*
+!models/.gitkeep
+!models/embeddings/
+models/embeddings/*
+!models/embeddings/.gitkeep
 cache/
 result/
 
@@ -46,13 +50,22 @@ htmlcov/
 
 # Keep folder placeholders if needed
 !outputs/.gitkeep
-!models/.gitkeep
 !data/.gitkeep
 # Large raw matrix (excluded from git push)
 data-source/kiba/full_matrix_kiba.csv
 
 # Raw source dumps
-data-source/
+data-source/*
+!data-source/.gitkeep
+!data-source/davis/
+data-source/davis/*
+!data-source/davis/.gitkeep
+!data-source/kiba/
+data-source/kiba/*
+!data-source/kiba/.gitkeep
+!data-source/bindingdb/
+data-source/bindingdb/*
+!data-source/bindingdb/.gitkeep
 
 # Large run artifacts
 outputs_binary/runs/
