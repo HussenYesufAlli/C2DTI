@@ -1,0 +1,76 @@
+{
+  "status": "ok",
+  "exit_code": 0,
+  "config": "configs/bindingdb_gate.yaml",
+  "dataset_name": "BindingDB",
+  "dataset_path": "/home/hussen/MINDG/C2DTI/datasets/BindingDB_Kd.csv",
+  "dataset_schema": {
+    "dataset_type": "csv",
+    "path_kind": "file",
+    "expected_path": "/home/hussen/MINDG/C2DTI/datasets/BindingDB_Kd.csv",
+    "required_columns": [
+      "Drug_ID",
+      "Target_ID",
+      "Y"
+    ],
+    "optional_alias_columns": {
+      "Drug_ID": [
+        "Drug"
+      ],
+      "Target_ID": [
+        "Target"
+      ]
+    },
+    "notes": [
+      "BindingDB path should point to a CSV file.",
+      "The loader converts Y from nM-like affinity values into pKd-based binary labels."
+    ]
+  },
+  "required_files": [
+    {
+      "path": "/home/hussen/MINDG/C2DTI/datasets/BindingDB_Kd.csv",
+      "status": "ok"
+    }
+  ],
+  "content_validation": {
+    "status": "ok",
+    "available_columns": [
+      "Drug_ID",
+      "Drug",
+      "Target_ID",
+      "Target",
+      "Y"
+    ],
+    "num_data_rows": 52274,
+    "required_columns": [
+      "Drug_ID",
+      "Target_ID",
+      "Y"
+    ],
+    "optional_alias_columns": {
+      "Drug_ID": [
+        "Drug"
+      ],
+      "Target_ID": [
+        "Target"
+      ]
+    },
+    "resolved_columns": {
+      "Drug_ID": "Drug_ID",
+      "Target_ID": "Target_ID",
+      "Y": "Y"
+    },
+    "missing_columns": [],
+    "reason": "BindingDB CSV contains the required columns"
+  },
+  "dataset_summary": {
+    "dataset_name": "BindingDB",
+    "num_drugs": 9887,
+    "num_targets": 1088,
+    "matrix_shape": [
+      9887,
+      1088
+    ],
+    "is_placeholder": false
+  }
+}

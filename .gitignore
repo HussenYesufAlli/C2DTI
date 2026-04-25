@@ -21,8 +21,26 @@ env/
 Thumbs.db
 
 # Build and runtime artifacts
-outputs/
-models/
+# Use glob (not trailing slash) so sub-exceptions below are respected by git
+outputs/*
+!outputs/runs/
+outputs/runs/*
+!outputs/runs/.gitkeep
+!outputs/reports/
+outputs/reports/*
+!outputs/reports/*.csv
+!outputs/gates/
+outputs/gates/*
+!outputs/gates/latest_gate_summary.md
+!outputs/checks/
+outputs/checks/*
+!outputs/checks/*.json
+!outputs/results_registry.csv
+models/*
+!models/.gitkeep
+!models/embeddings/
+models/embeddings/*
+!models/embeddings/.gitkeep
 cache/
 result/
 
@@ -46,13 +64,22 @@ htmlcov/
 
 # Keep folder placeholders if needed
 !outputs/.gitkeep
-!models/.gitkeep
 !data/.gitkeep
 # Large raw matrix (excluded from git push)
 data-source/kiba/full_matrix_kiba.csv
 
 # Raw source dumps
-data-source/
+data-source/*
+!data-source/.gitkeep
+!data-source/davis/
+data-source/davis/*
+!data-source/davis/.gitkeep
+!data-source/kiba/
+data-source/kiba/*
+!data-source/kiba/.gitkeep
+!data-source/bindingdb/
+data-source/bindingdb/*
+!data-source/bindingdb/.gitkeep
 
 # Large run artifacts
 outputs_binary/runs/

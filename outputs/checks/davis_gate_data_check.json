@@ -1,0 +1,50 @@
+{
+  "status": "ok",
+  "exit_code": 0,
+  "config": "configs/davis_gate.yaml",
+  "dataset_name": "DAVIS",
+  "dataset_path": "/home/hussen/MINDG/C2DTI/datasets/DAVIS.csv",
+  "dataset_schema": {
+    "dataset_type": "csv",
+    "path_kind": "file",
+    "expected_path": "/home/hussen/MINDG/C2DTI/datasets/DAVIS.csv",
+    "required_columns": [
+      "Drug_ID",
+      "Drug",
+      "Target_ID",
+      "Target",
+      "Y"
+    ],
+    "notes": [
+      "DAVIS can also be provided as a flat CSV export.",
+      "This matches the datasets/*.csv files used for regression experiments."
+    ]
+  },
+  "required_files": [
+    {
+      "path": "/home/hussen/MINDG/C2DTI/datasets/DAVIS.csv",
+      "status": "ok"
+    }
+  ],
+  "content_validation": {
+    "status": "ok",
+    "dataset": "DAVIS",
+    "num_drugs_from_file": 68,
+    "num_targets_from_file": 379,
+    "y_matrix_shape": [
+      68,
+      379
+    ],
+    "reason": "Flat CSV export contains the required DAVIS/KIBA columns"
+  },
+  "dataset_summary": {
+    "dataset_name": "DAVIS",
+    "num_drugs": 68,
+    "num_targets": 379,
+    "matrix_shape": [
+      68,
+      379
+    ],
+    "is_placeholder": false
+  }
+}
