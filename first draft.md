@@ -6,7 +6,7 @@ C2DTI: A Four-Pillar Causal Framework for Drug-Target Interaction Prediction wit
 
 ## Abstract (Draft)
 
-Drug-target interaction prediction benefits from strong representation learning, but many models remain vulnerable to shortcut correlations and weak cross-view consistency. We present a a cross-view causal drug-target interaction prediction with multimodal causal consistency (C2DTI), a four-pillar causal framework that integrates dual-view representation modeling, cross-view causal agreement, masked autoencoder self-supervision, and IRM-plus-counterfactual regularization within a unified training objective. The core idea is  agreement objective that enforces consistency between sequence and graph evidence under perturbation.The framework is organized as a reproducible, configuration-driven pipeline with explicit ablation controls for each pillar. In implementation validation, all causal modules execute end-to-end and expose stable diagnostics for agreement, reconstruction, invariance, and counterfactual sensitivity. The evaluation matrix tooling supports large-scale comparisons across datasets, split regimes, ablations, and random seeds. Full benchmark results are generated through the matrix pipeline and compiled into detailed and aggregate reports for publication analysis.
+Drug-target interaction (DTI) prediction has improved with deep representation learning, yet many models remain sensitive to shortcut correlations and weak agreement across modality views. We present C2DTI, a four-pillar causal framework that unifies dual-backbone representation learning, cross-view causal agreement under perturbation, masked autoencoder self-supervision, and invariant-plus-counterfactual regularization in a single objective. The key mechanism is a cross-view agreement term that enforces consistency between sequence evidence and structural graph evidence on both clean and perturbed inputs. C2DTI is implemented as a reproducible, configuration-driven pipeline with explicit ablation controls for each pillar. Implementation-level validation confirms that all causal modules execute end-to-end and produce stable diagnostics for agreement, reconstruction quality, invariance, and counterfactual sensitivity. The evaluation matrix tooling supports large-scale comparisons across datasets, split regimes, ablations, and random seeds, and compiles outputs into detailed and aggregate reports for publication analysis.
 
 ## 1. Introduction (Draft)
 
@@ -24,29 +24,47 @@ The key contribution is not only each pillar individually, but their integration
 
 ### 2.1 Pillar 1: Dual Backbone Views
 
-C2DTI combines representation paths for drug and target modalities and supports sequence-view features alongside frozen embedding usage. This establishes complementary perspectives for interaction scoring.
+C2DTI starts from dual sequence encoders: ChemBERTa for drug SMILES and ANKH for protein sequences. In our current implementation, these backbones are used in frozen mode and produce modality-specific embeddings that are fused by a lightweight interaction head. This branch provides the base prediction signal and defines the sequence-view environment used by the causal objectives.
 
 ### 2.2 Pillar 2: Cross-View Causal Agreement
 
-Cross-view consistency is enforced through agreement terms between sequence and graph predictions, including perturbation-aware terms. The objective penalizes disagreement and yields a bounded causal agreement score.
+Pillar 2 enforces agreement between sequence-view and graph-view predictions under both clean and perturbed conditions. Let \(p_{seq}\) and \(p_{graph}\) denote predictions from the two views, and let \(p_{seq}^{pert}\), \(p_{graph}^{pert}\) denote predictions after modality-specific perturbations (token masking for sequence, structural perturbation for graph). The cross-view loss is:
+
+$$
+L_{xview} = \mathrm{MSE}(p_{seq}, p_{graph}) + \mathrm{MSE}(p_{seq}^{pert}, p_{graph}) + \mathrm{MSE}(p_{seq}, p_{graph}^{pert}).
+$$
+
+This objective discourages view-specific shortcuts and favors signals that remain stable across modalities and interventions.
 
 ### 2.3 Pillar 3: Masked Autoencoder Self-Supervision
 
-For each modality embedding space, a masked reconstruction objective encourages structurally informative representations. Lower reconstruction loss corresponds to stronger recoverable signal.
+For each modality embedding space, we mask a subset of embedding dimensions and reconstruct the masked part from the unmasked part with a lightweight decoder. This is applied independently to drug and protein embeddings:
+
+$$
+L_{MAS} = L_{MAS}^{drug} + L_{MAS}^{prot},
+$$
+
+where each term is a masked-dimension reconstruction MSE. Lower \(L_{MAS}\) indicates stronger recoverable structure, and therefore more informative latent representations.
 
 ### 2.4 Pillar 4: IRM and Counterfactual Objectives
 
-Invariant risk minimization reduces environment-specific error variance, while counterfactual target swaps penalize shortcut-positive predictions. Together they promote invariance and pair-specific discrimination.
+Pillar 4 combines invariant risk minimization (IRM) with counterfactual (CF) regularization. IRM encourages a shared predictive rule across environments, which in C2DTI correspond to sequence-view and graph-view prediction contexts. CF regularization evaluates intervention-style pair perturbations (for example, target swaps) and penalizes high-confidence shortcut behavior on implausible pairs.
+
+Together, these terms promote features that are predictive across environments while preserving pair-specific discrimination.
 
 ### 2.5 Unified Objective
 
-The unified scorer combines all pillar losses with configurable lambda weights:
-- lambda_xview
-- lambda_mas
-- lambda_irm
-- lambda_cf
+All components are combined in a single training objective:
 
-This directly supports ablation studies by setting selected lambdas to zero while preserving a single training interface.
+$$
+L_{total} = L_{task} + \lambda_{xview}L_{xview} + \lambda_{mas}L_{MAS} + \lambda_{irm}L_{IRM} + \lambda_{cf}L_{CF}.
+$$
+
+The \(\lambda\) coefficients are configuration-controlled, so each pillar can be activated or removed for ablation without changing the training interface.
+
+### 2.6 Figure 1: Architecture Overview (Caption Draft)
+
+Figure 1 illustrates the full C2DTI pipeline. Drug SMILES and protein sequences are first encoded by dual frozen backbones to produce sequence-view representations (Pillar 1). In parallel, a structural branch computes graph-view predictions through MixHop-style multi-hop propagation. Cross-view causal agreement is then enforced between sequence and graph predictions under both clean and perturbed conditions (Pillar 2). On top of modality embeddings, masked autoencoder self-supervision reconstructs masked embedding dimensions for drug and protein spaces to preserve recoverable structure (Pillar 3). Finally, invariant risk minimization aligns predictive behavior across sequence-view and graph-view environments, while a counterfactual rejection term penalizes shortcut-positive responses under intervention-style pair perturbations (Pillar 4). All components are optimized through a unified objective that combines task loss with weighted causal regularizers, enabling direct ablation by adjusting lambda terms.
 
 ## 3. Experimental Protocol (Draft)
 
